@@ -32,28 +32,27 @@ const Convidado = sequelize.define(
     },
     telefone: {
       type: DataTypes.STRING(15),
-      allowNull: false,
     },
     genero: {
       type: DataTypes.STRING(20),
-      allowNull: false,
     },
     dataNascimento: {
       type: DataTypes.DATEONLY,
-      allowNull: false,
     },
     endereco: {
       type: DataTypes.STRING(200),
-      allowNull: false,
     },
     cidade: {
       type: DataTypes.STRING(100),
-      allowNull: false,
     },
     cep: {
       type: DataTypes.STRING(9),
-      allowNull: false,
     },
+    avatarUrl: {
+      type: DataTypes.STRING(500),
+    },
+
+    sobreMim: { type: DataTypes.STRING(500) },
   },
   {
     tableName: "Convidado",

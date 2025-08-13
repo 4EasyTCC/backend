@@ -2,18 +2,25 @@ require("dotenv").config();
 const express = require("express");
 const app = express();
 const cors = require("cors");
-const sequelize = require("./db");
 const jwt = require("jsonwebtoken");
+const sequelize = require("./db");
+const multer = require("multer");
+const path = require("path");
 
+// MODELS
 const Organizador = require("./models/Organizador");
 const Evento = require("./models/Evento");
 const Localizacao = require("./models/Localizacao");
 const Midia = require("./models/Midia");
 const Ingresso = require("./models/Ingresso");
 const Convidado = require("./models/Convidado");
+const Mensagem = require("./models/Mensagem");
+const Grupo = require("./models/Grupo");
 
 app.use(cors());
 app.use(express.json());
+app.use("/uploads", express.static("uploads"));
+
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -37,6 +44,19 @@ const autenticar = (req, res, next) => {
     next();
   });
 };
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "uploads/");
+  },
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + path.extname(file.originalname));
+  },
+});
+
+const upload = multer({ storage });
+
+// ROTAS ORGANIZADOR
 app.post("/cadastro/organizador", async (req, res) => {
   const { nome, email, senha } = req.body;
 
@@ -55,6 +75,7 @@ app.post("/cadastro/organizador", async (req, res) => {
     res.status(500).send("Erro ao criar organizador");
   }
 });
+
 app.post("/login/organizador", async (req, res) => {
   const { email, senha } = req.body;
 
@@ -127,33 +148,31 @@ app.post("/eventos", autenticar, async (req, res) => {
       },
     });
 
-    console.log("Localização criada:", localizacaoCriada.localizacaoId);
-
     const evento = await Evento.create({
       nomeEvento: nome,
       descEvento: descricao,
       tipoEvento: tipo,
       privacidadeEvento: privacidade,
-      dataInicio: dataInicio,
-      dataFim: dataFim,
+      dataInicio,
+      dataFim,
       localizacaoId: localizacaoCriada.localizacaoId,
       statusEvento: status,
       organizadorId: req.usuarioId,
     });
 
-    if (fotos && fotos.galeria) {
+    if (fotos?.galeria) {
       await Promise.all(
         fotos.galeria.map((url) =>
           Midia.create({
             eventoId: evento.eventoId,
             tipo: "imagem",
-            url: url,
+            url,
           })
         )
       );
     }
 
-    if (ingressos && ingressos.length > 0) {
+    if (ingressos?.length > 0) {
       await Promise.all(
         ingressos.map((ingresso) =>
           Ingresso.create({
@@ -186,13 +205,8 @@ app.get("/eventos", autenticar, async (req, res) => {
     const eventos = await Evento.findAll({
       where: { organizadorId: req.usuarioId },
       include: [
-        {
-          model: Localizacao,
-        },
-        {
-          model: Organizador,
-          attributes: ["nome"],
-        },
+        { model: Localizacao },
+        { model: Organizador, attributes: ["nome"] },
       ],
       order: [["dataInicio", "ASC"]],
     });
@@ -204,13 +218,21 @@ app.get("/eventos", autenticar, async (req, res) => {
   }
 });
 
-
-//parte cliente
+// ROTAS CONVIDADO
 app.post("/cadastro/convidado", async (req, res) => {
-  console.log("Requisição recebida no backend:", req.body);
-
   try {
-    const { cpf, email } = req.body;
+    const {
+      nome,
+      cpf,
+      email,
+      senha,
+      telefone,
+      genero,
+      dataNascimento,
+      endereco,
+      cidade,
+      cep,
+    } = req.body;
 
     if (!cpf || !email) {
       return res.status(400).json({
@@ -219,9 +241,9 @@ app.post("/cadastro/convidado", async (req, res) => {
       });
     }
 
-    const cpfExistente = await Convidado.findOne({
-      where: { cpf: cpf.replace(/\D/g, "") },
-    });
+    const cpfLimpo = cpf.replace(/\D/g, "");
+
+    const cpfExistente = await Convidado.findOne({ where: { cpf: cpfLimpo } });
     if (cpfExistente) {
       return res.status(400).json({
         success: false,
@@ -236,19 +258,21 @@ app.post("/cadastro/convidado", async (req, res) => {
         message: "Email já cadastrado",
       });
     }
-    const novoConvidado = await Convidado.create({
-      nome: req.body.nome,
-      cpf: req.body.cpf.replace(/\D/g, ""),
-      email: req.body.email,
-      senha: req.body.senha,
-      telefone: req.body.telefone.replace(/\D/g, ""),
-      genero: req.body.genero,
-      dataNascimento: req.body.dataNascimento,
-      endereco: req.body.endereco,
-      cidade: req.body.cidade,
-      cep: req.body.cep.replace(/\D/g, ""),
+
+    const convidadoCriado = await Convidado.create({
+      nome,
+      cpf: cpfLimpo,
+      email,
+      senha,
+      telefone: telefone?.replace(/\D/g, "") || null,
+      genero,
+      dataNascimento,
+      endereco,
+      cidade,
+      cep: cep?.replace(/\D/g, "") || null,
     });
-    const convidadoResponse = novoConvidado.toJSON();
+
+    const convidadoResponse = convidadoCriado.toJSON();
     delete convidadoResponse.senha;
 
     res.status(201).json({
@@ -258,7 +282,6 @@ app.post("/cadastro/convidado", async (req, res) => {
     });
   } catch (error) {
     console.error("Erro no cadastro:", error);
-
     let mensagem = "Erro ao cadastrar convidado";
     if (error.name === "SequelizeValidationError") {
       mensagem = error.errors.map((e) => e.message).join(", ");
@@ -283,17 +306,10 @@ app.post("/login/convidado", async (req, res) => {
       attributes: ["convidadoId", "nome", "email", "senha", "cpf"],
     });
 
-    if (!convidado) {
+    if (!convidado || convidado.senha !== senha) {
       return res.status(401).json({
         success: false,
-        message: "E-mail não cadastrado",
-      });
-    }
-
-    if (convidado.senha !== senha) {
-      return res.status(401).json({
-        success: false,
-        message: "Senha incorreta",
+        message: "Credenciais inválidas",
       });
     }
 
@@ -324,14 +340,159 @@ app.post("/login/convidado", async (req, res) => {
     });
   }
 });
+// Rota GET perfil do convidado logado
+app.get("/perfil/convidado", autenticar, async (req, res) => {
+  try {
+    const convidado = await Convidado.findByPk(req.usuarioId, {
+      attributes: ["convidadoId", "nome", "email", "avatarUrl", "sobreMim"],
+    });
+
+    if (!convidado) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Convidado não encontrado" });
+    }
+
+    // Estatísticas (mock — depois pode vir do banco real)
+    const estatisticas = {
+      amigos: 10,
+      eventos: 10,
+      notificacoes: 10,
+      avaliacoes: 10,
+      categoriaMaisFrequente: "Festivais",
+      localMaisVisitado: "Etasp",
+    };
+
+    // Favoritos (mock — pode vir de tabela separada)
+    const eventosFavoritos = Array(6).fill({
+      nome: "Evento X",
+      imagem: "/uploads/evento.png",
+    });
+    const profissoesFavoritas = Array(6).fill({
+      nome: "DJ",
+      imagem: "/uploads/profissao.png",
+    });
+
+    res.json({
+      success: true,
+      convidado,
+      estatisticas,
+      eventosFavoritos,
+      profissoesFavoritas,
+    });
+  } catch (error) {
+    console.error("Erro ao buscar perfil:", error);
+    res.status(500).json({ success: false, message: "Erro ao buscar perfil" });
+  }
+});
+
+// UPLOAD DE ARQUIVO
+app.post("/upload", upload.single("arquivo"), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ message: "Nenhum arquivo enviado." });
+  }
+
+  res.status(200).json({
+    url: `/uploads/${req.file.filename}`,
+    nomeArquivo: req.file.filename,
+  });
+});
+
+// SOCKET.IO
+const http = require("http").createServer(app);
+const io = require("socket.io")(http, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"],
+  },
+});
+
+io.on("connection", (socket) => {
+  console.log("Usuário conectado ao chat");
+
+  socket.on("entrarGrupo", ({ grupoId }) => {
+    socket.join(`grupo-${grupoId}`);
+  });
+
+  socket.on("mensagem", async (msg) => {
+    const novaMensagem = await Mensagem.create(msg);
+    io.to(`grupo-${msg.grupoId}`).emit("mensagemRecebida", novaMensagem);
+  });
+
+  socket.on("disconnect", () => {
+    console.log("Usuário saiu do chat");
+  });
+});
+
+app.post("/mensagens", autenticar, async (req, res) => {
+  try {
+    const { conteudo, tipo, grupoId, urlArquivo } = req.body;
+
+    const novaMensagem = await Mensagem.create({
+      conteudo,
+      tipo: tipo || "texto",
+      grupoId,
+      remetenteId: req.usuarioId,
+      remetenteTipo: req.tipo || "organizador",
+      urlArquivo: urlArquivo || null,
+    });
+
+    res.status(201).json({
+      success: true,
+      mensagem: novaMensagem,
+    });
+  } catch (error) {
+    console.error("Erro ao criar mensagem:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erro ao criar mensagem",
+      error: error.message,
+    });
+  }
+});
+
+// BUSCAR MENSAGENS
+app.get("/mensagens/:grupoId", autenticar, async (req, res) => {
+  try {
+    const { grupoId } = req.params;
+
+    const mensagens = await Mensagem.findAll({
+      where: { grupoId },
+      order: [["createdAt", "ASC"]],
+    });
+
+    res.status(200).json(mensagens);
+  } catch (error) {
+    console.error("Erro ao buscar mensagens:", error);
+    res.status(500).json({ message: "Erro ao buscar mensagens" });
+  }
+});
+// Exemplo usando Express + Sequelize
+app.get("/mensagens/grupo/:grupoId", async (req, res) => {
+  const { grupoId } = req.params;
+
+  try {
+    const mensagens = await Mensagem.findAll({
+      where: { grupoId },
+      order: [["createdAt", "ASC"]],
+    });
+
+    res.json({ success: true, mensagens });
+  } catch (error) {
+    console.error("Erro ao buscar mensagens:", error);
+    res.status(500).json({ success: false, erro: "Erro interno" });
+  }
+});
+
+// START SERVER
+http.listen(PORT, () => {
+  console.log(`Servidor rodando com Socket.IO na porta: ${PORT}`);
+});
 
 sequelize
   .sync({ force: false })
   .then(() => {
     console.log("Modelos sincronizados com o banco de dados");
-    app.listen(PORT, () => {
-      console.log(`Servidor rodando na porta: ${PORT}`);
-    });
   })
   .catch((err) => {
     console.error("Erro ao sincronizar modelos:", err);
