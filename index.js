@@ -7,7 +7,6 @@ const sequelize = require("./db");
 const multer = require("multer");
 const path = require("path");
 
-// MODELS
 const Organizador = require("./models/Organizador");
 const Evento = require("./models/Evento");
 const Localizacao = require("./models/Localizacao");
@@ -24,27 +23,68 @@ app.use("/uploads", express.static("uploads"));
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET;
 
-const autenticar = (req, res, next) => {
-  const token = req.headers["authorization"];
-  console.log("Token recebido:", token);
-
-  if (!token) {
-    return res.status(401).json({ message: "Token não fornecido" });
-  }
-
-  const tokenClean = token.replace("Bearer ", "");
-  console.log("Token limpo:", tokenClean);
-
-  jwt.verify(tokenClean, JWT_SECRET, (err, decoded) => {
-    if (err) {
-      console.error("Erro detalhado:", err);
-      return res.status(401).json({ message: "Token inválido" });
+const verificarToken = async (token) => {
+  try {
+    if (!token) {
+      return null;
     }
-    req.usuarioId = decoded.id;
-    next();
-  });
+
+    const decoded = jwt.verify(token, JWT_SECRET);
+
+    if (decoded.tipo === "organizador") {
+      const organizador = await Organizador.findByPk(decoded.id);
+      return organizador;
+    } else if (decoded.tipo === "convidado") {
+      const convidado = await Convidado.findByPk(decoded.id);
+      return convidado;
+    }
+
+    return null;
+  } catch (error) {
+    console.error("Erro ao verificar token:", error);
+    return null;
+  }
 };
 
+const autenticar = async (req, res, next) => {
+  try {
+    console.log("Headers:", req.headers);
+    const token = req.headers.authorization?.replace("Bearer ", "");
+    console.log("Token recebido:", token);
+
+    if (!token) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Token não fornecido" });
+    }
+
+    const usuario = await verificarToken(token);
+    console.log("Usuário encontrado:", usuario);
+
+    if (!usuario) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Token inválido" });
+    }
+
+    req.usuario = usuario;
+    req.usuarioId = usuario.organizadorId || usuario.convidadoId;
+    req.tipoUsuario =
+      usuario instanceof Organizador ? "organizador" : "convidado";
+
+    console.log("Autenticação bem-sucedida:", {
+      usuarioId: req.usuarioId,
+      tipoUsuario: req.tipoUsuario,
+    });
+
+    next();
+  } catch (error) {
+    console.error("Erro na autenticação:", error);
+    return res
+      .status(401)
+      .json({ success: false, message: "Erro de autenticação" });
+  }
+};
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, "uploads/");
@@ -56,7 +96,6 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-// ROTAS ORGANIZADOR
 app.post("/cadastro/organizador", async (req, res) => {
   const { nome, email, senha } = req.body;
 
@@ -127,22 +166,35 @@ app.post("/eventos", autenticar, async (req, res) => {
       fotos,
       ingressos,
       status,
+      criarChat = true,
     } = req.body;
+
+    if (
+      !nome ||
+      !descricao ||
+      !tipo ||
+      !privacidade ||
+      !dataInicio ||
+      !localizacao
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Campos obrigatórios não preenchidos",
+      });
+    }
 
     const [localizacaoCriada] = await Localizacao.findOrCreate({
       where: {
         latitude: localizacao.latitude,
         longitude: localizacao.longitude,
         endereco: localizacao.endereco,
-        cidade: localizacao.cidade || null,
-        estado: localizacao.estado || null,
       },
       defaults: {
         endereco: localizacao.endereco,
         cidade: localizacao.cidade || null,
         estado: localizacao.estado || null,
         complemento: localizacao.complemento || null,
-        cep: localizacao.cep,
+        cep: localizacao.cep || null,
         latitude: localizacao.latitude,
         longitude: localizacao.longitude,
       },
@@ -154,71 +206,194 @@ app.post("/eventos", autenticar, async (req, res) => {
       tipoEvento: tipo,
       privacidadeEvento: privacidade,
       dataInicio,
-      dataFim,
+      dataFim: dataFim || dataInicio,
       localizacaoId: localizacaoCriada.localizacaoId,
-      statusEvento: status,
+      statusEvento: status || "ativo",
       organizadorId: req.usuarioId,
     });
 
-    if (fotos?.galeria) {
-      await Promise.all(
-        fotos.galeria.map((url) =>
-          Midia.create({
-            eventoId: evento.eventoId,
-            tipo: "imagem",
-            url,
-          })
-        )
-      );
+    if (fotos && fotos.length > 0) {
+      for (const foto of fotos) {
+        await Midia.create({
+          url: foto.url,
+          tipo: foto.tipo || "imagem",
+          eventoId: evento.eventoId,
+        });
+      }
     }
 
-    if (ingressos?.length > 0) {
-      await Promise.all(
-        ingressos.map((ingresso) =>
-          Ingresso.create({
-            eventoId: evento.eventoId,
-            nome: ingresso.nome,
-            descricao: ingresso.descricao,
-            preco: ingresso.preco,
-            quantidade: ingresso.quantidade,
-            dataLimite: ingresso.dataLimite,
-          })
-        )
-      );
+    if (ingressos && ingressos.length > 0) {
+      for (const ing of ingressos) {
+        const ingressoData = {
+          nome: ing.nome,
+          quantidade: ing.quantidade || 0,
+          preco: ing.preco || 0,
+          descricao: ing.descricao || null,
+          dataLimiteVenda: ing.dataLimiteVenda || null,
+          eventoId: evento.eventoId,
+        };
+
+        await Ingresso.create(ingressoData);
+      }
+    }
+
+    let grupoChat = null;
+    if (criarChat) {
+      grupoChat = await Grupo.create({
+        nome: nome,
+        descricao: `Grupo de chat do evento ${nome}`,
+        tipo: "evento",
+        eventoId: evento.eventoId,
+        organizadorId: req.usuarioId,
+      });
     }
 
     res.status(201).json({
       success: true,
-      eventoId: evento.eventoId,
+      message: "Evento criado com sucesso!",
+      evento,
+      grupoChat,
     });
   } catch (error) {
-    console.error("Erro ao criar evento completo:", error);
+    console.error("Erro ao criar evento:", error);
     res.status(500).json({
       success: false,
-      error: "Erro ao criar evento",
+      message: "Erro ao criar evento",
+      error: error.message,
     });
   }
 });
-
 app.get("/eventos", autenticar, async (req, res) => {
   try {
     const eventos = await Evento.findAll({
       where: { organizadorId: req.usuarioId },
       include: [
-        { model: Localizacao },
-        { model: Organizador, attributes: ["nome"] },
+        {
+          model: Localizacao,
+          as: "localizacao",
+          attributes: ["endereco", "cidade", "estado"],
+        },
+        {
+          model: Organizador,
+          as: "organizador",
+          attributes: ["organizadorId", "nome", "email"],
+        },
       ],
       order: [["dataInicio", "ASC"]],
     });
 
+    console.log(
+      "Eventos encontrados:",
+      eventos.map((e) => ({
+        id: e.eventoId,
+        nome: e.nomeEvento,
+        organizador: e.organizador ? e.organizador.nome : "N/A",
+      }))
+    );
+
     res.status(200).json(eventos);
   } catch (error) {
     console.error("Erro ao buscar eventos:", error);
-    res.status(500).json({ message: "Erro ao buscar eventos" });
+    res.status(500).json({
+      success: false,
+      message: "Erro ao buscar eventos",
+      error: error.message,
+    });
   }
 });
 
-// ROTAS CONVIDADO
+app.get("/perfil/organizador", autenticar, async (req, res) => {
+  try {
+    const organizador = await Organizador.findByPk(req.usuarioId, {
+      attributes: ["organizadorId", "nome", "email", "avatarUrl"],
+      include: [
+        {
+          model: Evento,
+          as: "eventos",
+          attributes: ["eventoId", "nomeEvento", "dataInicio"],
+          limit: 5,
+          order: [["dataInicio", "DESC"]],
+        },
+      ],
+    });
+
+    if (!organizador) {
+      return res.status(404).json({
+        success: false,
+        message: "Organizador não encontrado",
+      });
+    }
+
+    const estatisticas = {
+      totalEventos: await Evento.count({
+        where: { organizadorId: req.usuarioId },
+      }),
+      eventosAtivos: await Evento.count({
+        where: {
+          organizadorId: req.usuarioId,
+          statusEvento: "ativo",
+        },
+      }),
+    };
+
+    res.json({
+      success: true,
+      perfil: {
+        ...organizador.get({ plain: true }),
+        estatisticas,
+      },
+    });
+  } catch (error) {
+    console.error("Erro no perfil organizador:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erro interno no servidor",
+      error: error.message,
+    });
+  }
+});
+app.put(
+  "/perfil/organizador/foto",
+  autenticar,
+  upload.single("avatar"),
+  async (req, res) => {
+    try {
+      if (req.tipoUsuario !== "organizador") {
+        return res.status(403).json({
+          success: false,
+          message: "Acesso não autorizado",
+        });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: "Nenhuma imagem enviada",
+        });
+      }
+
+      const avatarUrl = `/uploads/${req.file.filename}`;
+
+      await Organizador.update(
+        { avatarUrl },
+        { where: { organizadorId: req.usuarioId } }
+      );
+
+      res.json({
+        success: true,
+        message: "Foto atualizada com sucesso",
+        avatarUrl,
+      });
+    } catch (error) {
+      console.error("Erro ao atualizar foto:", error);
+      res.status(500).json({
+        success: false,
+        message: "Erro ao processar foto",
+        error: error.message,
+      });
+    }
+  }
+);
 app.post("/cadastro/convidado", async (req, res) => {
   try {
     const {
@@ -340,7 +515,6 @@ app.post("/login/convidado", async (req, res) => {
     });
   }
 });
-// Rota GET perfil do convidado logado
 app.get("/perfil/convidado", autenticar, async (req, res) => {
   try {
     const convidado = await Convidado.findByPk(req.usuarioId, {
@@ -353,7 +527,6 @@ app.get("/perfil/convidado", autenticar, async (req, res) => {
         .json({ success: false, message: "Convidado não encontrado" });
     }
 
-    // Estatísticas (mock — depois pode vir do banco real)
     const estatisticas = {
       amigos: 10,
       eventos: 10,
@@ -363,7 +536,6 @@ app.get("/perfil/convidado", autenticar, async (req, res) => {
       localMaisVisitado: "Etasp",
     };
 
-    // Favoritos (mock — pode vir de tabela separada)
     const eventosFavoritos = Array(6).fill({
       nome: "Evento X",
       imagem: "/uploads/evento.png",
@@ -386,7 +558,6 @@ app.get("/perfil/convidado", autenticar, async (req, res) => {
   }
 });
 
-// UPLOAD DE ARQUIVO
 app.post("/upload", upload.single("arquivo"), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ message: "Nenhum arquivo enviado." });
@@ -398,7 +569,6 @@ app.post("/upload", upload.single("arquivo"), (req, res) => {
   });
 });
 
-// SOCKET.IO
 const http = require("http").createServer(app);
 const io = require("socket.io")(http, {
   cors: {
@@ -407,51 +577,130 @@ const io = require("socket.io")(http, {
   },
 });
 
-io.on("connection", (socket) => {
-  console.log("Usuário conectado ao chat");
+io.use((socket, next) => {
+  const token = socket.handshake.auth.token;
 
-  socket.on("entrarGrupo", ({ grupoId }) => {
-    socket.join(`grupo-${grupoId}`);
+  if (!token) {
+    return next(new Error("Token não fornecido"));
+  }
+
+  verificarToken(token)
+    .then((usuario) => {
+      if (!usuario) {
+        return next(new Error("Token inválido"));
+      }
+      socket.usuario = usuario;
+      next();
+    })
+    .catch((error) => {
+      next(new Error("Erro de autenticação"));
+    });
+});
+
+io.on("connection", (socket) => {
+  console.log("Usuário conectado:", socket.id);
+
+  socket.on("entrar_grupo", (grupoId) => {
+    socket.join(`grupo_${grupoId}`);
+    console.log(`Usuário entrou no grupo ${grupoId}`);
   });
 
-  socket.on("mensagem", async (msg) => {
-    const novaMensagem = await Mensagem.create(msg);
-    io.to(`grupo-${msg.grupoId}`).emit("mensagemRecebida", novaMensagem);
+  socket.on("sair_grupo", (grupoId) => {
+    socket.leave(`grupo_${grupoId}`);
+    console.log(`Usuário saiu do grupo ${grupoId}`);
   });
 
   socket.on("disconnect", () => {
-    console.log("Usuário saiu do chat");
+    console.log("Usuário desconectado:", socket.id);
   });
 });
-
-app.post("/mensagens", autenticar, async (req, res) => {
+app.get("/grupos", autenticar, async (req, res) => {
   try {
-    const { conteudo, tipo, grupoId, urlArquivo } = req.body;
+    console.log(
+      `Buscando grupos para usuário: ${req.usuarioId}, tipo: ${req.tipoUsuario}`
+    );
 
-    const novaMensagem = await Mensagem.create({
-      conteudo,
-      tipo: tipo || "texto",
-      grupoId,
-      remetenteId: req.usuarioId,
-      remetenteTipo: req.tipo || "organizador",
-      urlArquivo: urlArquivo || null,
-    });
+    let grupos;
 
-    res.status(201).json({
+    if (req.tipoUsuario === "organizador") {
+      console.log("Buscando grupos do organizador");
+      grupos = await Grupo.findAll({
+        where: { organizadorId: req.usuarioId },
+        include: [
+          {
+            model: Evento,
+            as: "evento",
+            attributes: ["nomeEvento", "dataInicio"],
+            required: false,
+          },
+        ],
+      });
+    } else {
+      console.log("Buscando todos os grupos (convidado)");
+      grupos = await Grupo.findAll({
+        include: [
+          {
+            model: Evento,
+            as: "evento",
+            attributes: ["nomeEvento", "dataInicio"],
+            required: false,
+          },
+        ],
+      });
+    }
+
+    console.log(`Encontrados ${grupos.length} grupos`);
+
+    res.json({
       success: true,
-      mensagem: novaMensagem,
+      grupos: grupos || [],
     });
   } catch (error) {
-    console.error("Erro ao criar mensagem:", error);
+    console.error("Erro detalhado ao buscar grupos:", error);
     res.status(500).json({
       success: false,
-      message: "Erro ao criar mensagem",
-      error: error.message,
+      message: "Erro interno ao buscar grupos",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
     });
   }
 });
+app.get("/mensagens/:grupoId", autenticar, async (req, res) => {
+  try {
+    const { grupoId } = req.params;
+    console.log("Rota GET /mensagens/:grupoId alcançada para grupo:", grupoId);
 
-// BUSCAR MENSAGENS
+    const grupo = await Grupo.findByPk(grupoId);
+    if (!grupo) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Grupo não encontrado" });
+    }
+
+    const mensagens = await Mensagem.findAll({
+      where: { grupoId },
+      include: [
+        {
+          model: req.tipoUsuario === "organizador" ? Organizador : Convidado,
+          as: "organizador",
+          attributes: ["nome", "email"],
+        },
+      ],
+      order: [["createdAt", "ASC"]],
+    });
+
+    console.log(
+      `Encontradas ${mensagens.length} mensagens para o grupo ${grupoId}`
+    );
+
+    res.json({ success: true, mensagens });
+  } catch (error) {
+    console.error("Erro ao buscar mensagens:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Erro interno do servidor" });
+  }
+});
+
 app.get("/mensagens/:grupoId", autenticar, async (req, res) => {
   try {
     const { grupoId } = req.params;
@@ -461,30 +710,75 @@ app.get("/mensagens/:grupoId", autenticar, async (req, res) => {
       order: [["createdAt", "ASC"]],
     });
 
-    res.status(200).json(mensagens);
+    const mensagensCompletas = await Promise.all(
+      mensagens.map(async (msg) => {
+        let usuario;
+
+        if (msg.tipoUsuario === "organizador") {
+          usuario = await Organizador.findByPk(msg.usuarioId, {
+            attributes: ["nome", "email"],
+          });
+        } else {
+          usuario = await Convidado.findByPk(msg.usuarioId, {
+            attributes: ["nome", "email"],
+          });
+        }
+
+        return {
+          ...msg.toJSON(),
+          usuario: usuario || { nome: "Usuário desconhecido" },
+        };
+      })
+    );
+
+    res.json({ success: true, mensagens: mensagensCompletas });
   } catch (error) {
     console.error("Erro ao buscar mensagens:", error);
-    res.status(500).json({ message: "Erro ao buscar mensagens" });
+    res
+      .status(500)
+      .json({ success: false, message: "Erro interno do servidor" });
   }
 });
-// Exemplo usando Express + Sequelize
-app.get("/mensagens/grupo/:grupoId", async (req, res) => {
-  const { grupoId } = req.params;
 
+app.post("/mensagens/:grupoId", autenticar, async (req, res) => {
   try {
-    const mensagens = await Mensagem.findAll({
-      where: { grupoId },
-      order: [["createdAt", "ASC"]],
+    const { grupoId } = req.params;
+    const { texto } = req.body;
+
+    const novaMensagem = await Mensagem.create({
+      texto,
+      grupoId,
+      usuarioId: req.usuarioId,
+      tipoUsuario: req.tipoUsuario,
     });
 
-    res.json({ success: true, mensagens });
+    let usuario;
+    if (req.tipoUsuario === "organizador") {
+      usuario = await Organizador.findByPk(req.usuarioId, {
+        attributes: ["nome", "email"],
+      });
+    } else {
+      usuario = await Convidado.findByPk(req.usuarioId, {
+        attributes: ["nome", "email"],
+      });
+    }
+
+    const mensagemCompleta = {
+      ...novaMensagem.toJSON(),
+      usuario: usuario || { nome: "Usuário desconhecido" },
+    };
+
+    io.to(`grupo_${grupoId}`).emit("nova_mensagem", mensagemCompleta);
+
+    res.json({ success: true, mensagem: mensagemCompleta });
   } catch (error) {
-    console.error("Erro ao buscar mensagens:", error);
-    res.status(500).json({ success: false, erro: "Erro interno" });
+    console.error("Erro ao enviar mensagem:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Erro interno do servidor" });
   }
 });
 
-// START SERVER
 http.listen(PORT, () => {
   console.log(`Servidor rodando com Socket.IO na porta: ${PORT}`);
 });

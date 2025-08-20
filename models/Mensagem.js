@@ -9,29 +9,29 @@ const Mensagem = sequelize.define(
       autoIncrement: true,
       primaryKey: true,
     },
-    conteudo: {
+    texto: {
       type: DataTypes.TEXT,
-      allowNull: true,
+      allowNull: false,
     },
     tipo: {
-      type: DataTypes.STRING, //texto imagem audoo
+      type: DataTypes.STRING,
       defaultValue: "texto",
     },
-    remetenteId: {
+    usuarioId: {
       type: DataTypes.INTEGER,
       allowNull: false,
     },
-    remetenteTipo: {
-      type: DataTypes.STRING, 
+    tipoUsuario: {
+      type: DataTypes.STRING, // 'organizador' ou 'convidado'
       allowNull: false,
     },
     grupoId: {
       type: DataTypes.INTEGER,
       allowNull: false,
-    },
-    urlArquivo: {
-      type: DataTypes.STRING,
-      allowNull: true,
+      references: {
+        model: "Grupo",
+        key: "grupoId",
+      },
     },
   },
   {
@@ -41,3 +41,16 @@ const Mensagem = sequelize.define(
 );
 
 module.exports = Mensagem;
+
+const Organizador = require("./Organizador");
+const Grupo = require("./Grupo");
+
+Mensagem.belongsTo(Organizador, {
+  foreignKey: "usuarioId",
+  as: "organizador",
+});
+
+Mensagem.belongsTo(Grupo, {
+  foreignKey: "grupoId",
+  as: "grupo",
+});

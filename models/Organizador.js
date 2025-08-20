@@ -19,9 +19,18 @@ const Organizador = sequelize.define(
     senha: {
       type: DataTypes.STRING,
     },
+    avatarUrl: {
+      type: DataTypes.STRING,
+    },
   },
-  { tableName: "Organizador", tymestamps: false }
+  { tableName: "Organizador", timestamps: false }
 );
 
-sequelize.sync();
 module.exports = Organizador;
+
+const Evento = require("./Evento");
+
+Organizador.hasMany(Evento, {
+  foreignKey: "organizadorId",
+  as: "eventos",
+});

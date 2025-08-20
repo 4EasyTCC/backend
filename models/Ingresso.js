@@ -35,7 +35,8 @@ const Ingresso = sequelize.define(
     },
     dataLimite: {
       type: DataTypes.DATE,
-      allowNull: false,
+      allowNull: true,
+      defaultValue: null,
     },
     qrCode: {
       type: DataTypes.TEXT,
@@ -48,6 +49,7 @@ const Ingresso = sequelize.define(
   }
 );
 
+module.exports = Ingresso;
 Ingresso.belongsTo(Evento, {
   foreignKey: {
     name: "eventoId",
@@ -57,5 +59,3 @@ Ingresso.belongsTo(Evento, {
 Evento.hasMany(Ingresso, {
   foreignKey: "eventoId",
 });
-
-module.exports = Ingresso;
