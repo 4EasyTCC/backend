@@ -947,53 +947,6 @@ app.get('/api/localizacoes', async (req, res) => {
   }
 });
 
-// GET /api/eventos/:id
-app.get('/api/eventos/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    const evento = await Evento.findByPk(id, {
-      include: [
-        {
-          model: Localizacao,
-          as: 'localizacao',
-          attributes: ['endereco', 'cidade', 'estado', 'cep', 'complemento', 'latitude', 'longitude']
-        },
-        {
-          model: Organizador,
-          as: 'organizador',
-          attributes: ['organizadorId', 'nome', 'email', 'avatarUrl']
-        },
-        {
-          model: Ingresso,
-          attributes: ['ingressoId', 'nome', 'descricao', 'preco', 'quantidade', 'dataLimite']
-        },
-        {
-          model: Midia,
-          attributes: ['midiaId', 'url', 'tipo']
-        }
-      ]
-    });
-    
-    if (!evento) {
-      return res.status(404).json({
-        success: false,
-        message: 'Evento não encontrado'
-      });
-    }
-    
-    res.status(200).json({
-      success: true,
-      evento
-    });
-  } catch (error) {
-    console.error('Erro ao buscar evento:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erro ao buscar evento'
-    });
-  }
-});
 
 // GET /api/eventos/:id - Detalhes completos de um evento
 app.get('/api/eventos/:id', async (req, res) => {
