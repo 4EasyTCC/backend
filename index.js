@@ -779,6 +779,271 @@ app.post("/mensagens/:grupoId", autenticar, async (req, res) => {
   }
 });
 
+// GET /api/eventos/filtrados
+app.get('/api/eventos/filtrados', async (req, res) => {
+  try {
+    const { 
+      categoria, 
+      preco, 
+      tipo, 
+      localizacao, 
+      pagina = 1, 
+      limite = 24 
+    } = req.query;
+    
+    const offset = (parseInt(pagina) - 1) * parseInt(limite);
+    let whereClause = { statusEvento: 'ativo' };
+    
+    let includeClause = [
+      {
+        model: Localizacao,
+        as: 'localizacao',
+        attributes: ['endereco', 'cidade', 'estado']
+      },
+      {
+        model: Organizador,
+        as: 'organizador',
+        attributes: ['nome']
+      },
+      {
+        model: Ingresso,
+        attributes: ['preco'],
+        required: false // Importantíssimo: não requer ingresso para evitar excluir eventos sem ingressos
+      },
+      {
+        model: Midia,
+        attributes: ['url'],
+        where: { tipo: 'capa' },
+        required: false
+      }
+    ];
+
+    // Ordenação padrão (aleatória quando não há filtros)
+    let orderClause = [['dataInicio', 'ASC']];
+    
+    // Se não há filtros ativos, ordenar aleatoriamente
+    if (!categoria && preco === 'qualquer' && tipo === 'qualquer' && !localizacao) {
+      orderClause = [sequelize.fn('RAND')];
+    }
+
+    // Filtro por categoria (suporta múltiplas categorias)
+    if (categoria && categoria !== '') {
+      const categoriasArray = categoria.split(',');
+      whereClause.tipoEvento = { [Op.in]: categoriasArray };
+    }
+
+    // Filtro por tipo (presencial/online)
+    if (tipo && tipo !== 'qualquer') {
+      if (tipo === 'online') {
+        whereClause['$localizacao.endereco$'] = { [Op.is]: null };
+      } else if (tipo === 'presencial') {
+        whereClause['$localizacao.endereco$'] = { [Op.not]: null };
+      }
+    }
+
+    // Filtro por localização (busca parcial case-insensitive)
+    if (localizacao && localizacao !== '') {
+      whereClause['$localizacao.cidade$'] = { 
+        [Op.iLike]: `%${localizacao}%` 
+      };
+    }
+
+    // Primeiro: contar total de eventos para paginação
+    const totalEventos = await Evento.count({
+      where: whereClause,
+      include: includeClause.filter(inc => inc.model !== Ingresso && inc.model !== Midia),
+      distinct: true
+    });
+
+    // Segundo: buscar eventos com limites
+    const eventos = await Evento.findAll({
+      where: whereClause,
+      include: includeClause,
+      order: orderClause,
+      limit: parseInt(limite),
+      offset: offset,
+      subQuery: false
+    });
+
+    // Filtro por preço (após buscar os eventos)
+    let eventosFiltrados = eventos;
+    if (preco && preco !== 'qualquer') {
+      eventosFiltrados = eventos.filter(evento => {
+        const temIngressos = evento.Ingressos && evento.Ingressos.length > 0;
+        const temIngressoGratis = temIngressos && evento.Ingressos.some(ingresso => 
+          parseFloat(ingresso.preco) === 0
+        );
+        const temIngressoPago = temIngressos && evento.Ingressos.some(ingresso => 
+          parseFloat(ingresso.preco) > 0
+        );
+        
+        if (preco === 'gratis') {
+          return temIngressoGratis || !temIngressos; // Considera eventos sem ingressos como gratuitos
+        } else if (preco === 'pago') {
+          return temIngressoPago;
+        }
+        return true;
+      });
+    }
+
+    res.status(200).json({
+      eventos: eventosFiltrados,
+      total: totalEventos,
+      totalPaginas: Math.ceil(totalEventos / parseInt(limite)),
+      paginaAtual: parseInt(pagina)
+    });
+  } catch (error) {
+    console.error('Erro ao buscar eventos filtrados:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erro ao buscar eventos',
+      error: error.message
+    });
+  }
+});
+
+app.get('/api/eventos/categorias', async (req, res) => {
+  const categorias = [
+    'Arte, Cultura e Lazer', 'Congressos e Palestras', 'Cursos e Workshops',
+    'Esporte', 'Festas e Shows', 'Gastronomia', 'Games e Geek', 'Grátis',
+    'Infantil', 'Moda e Beleza', 'Passeios e Tours', 'Religião e Espiritualidade',
+    'Saúde e Bem-Estar', 'Teatros e Espetáculos'
+  ];
+  
+  res.status(200).json(categorias);
+});
+
+// GET /api/localizacoes
+app.get('/api/localizacoes', async (req, res) => {
+  try {
+    const localizacoes = await Localizacao.findAll({
+      attributes: [
+        [sequelize.fn('DISTINCT', sequelize.col('cidade')), 'cidade'],
+        'estado'
+      ],
+      where: {
+        cidade: {
+          [Op.ne]: null
+        }
+      },
+      order: [
+        ['cidade', 'ASC'],
+        ['estado', 'ASC']
+      ],
+      limit: 50 // Limitar para não sobrecarregar
+    });
+    
+    const cidadesFormatadas = localizacoes.map(loc => 
+      loc.estado ? `${loc.cidade}, ${loc.estado}` : loc.cidade
+    );
+    
+    res.status(200).json(cidadesFormatadas);
+  } catch (error) {
+    console.error('Erro ao buscar localizações:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erro ao buscar localizações'
+    });
+  }
+});
+
+// GET /api/eventos/:id
+app.get('/api/eventos/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const evento = await Evento.findByPk(id, {
+      include: [
+        {
+          model: Localizacao,
+          as: 'localizacao',
+          attributes: ['endereco', 'cidade', 'estado', 'cep', 'complemento', 'latitude', 'longitude']
+        },
+        {
+          model: Organizador,
+          as: 'organizador',
+          attributes: ['organizadorId', 'nome', 'email', 'avatarUrl']
+        },
+        {
+          model: Ingresso,
+          attributes: ['ingressoId', 'nome', 'descricao', 'preco', 'quantidade', 'dataLimite']
+        },
+        {
+          model: Midia,
+          attributes: ['midiaId', 'url', 'tipo']
+        }
+      ]
+    });
+    
+    if (!evento) {
+      return res.status(404).json({
+        success: false,
+        message: 'Evento não encontrado'
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      evento
+    });
+  } catch (error) {
+    console.error('Erro ao buscar evento:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erro ao buscar evento'
+    });
+  }
+});
+
+// GET /api/eventos/:id - Detalhes completos de um evento
+app.get('/api/eventos/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const evento = await Evento.findByPk(id, {
+      include: [
+        {
+          model: Localizacao,
+          as: 'localizacao',
+          attributes: ['endereco', 'cidade', 'estado', 'cep', 'complemento']
+        },
+        {
+          model: Organizador,
+          as: 'organizador',
+          attributes: ['organizadorId', 'nome', 'email', 'avatarUrl']
+        },
+        {
+          model: Ingresso,
+          attributes: ['ingressoId', 'nome', 'descricao', 'preco', 'quantidade', 'dataLimite']
+        },
+        {
+          model: Midia,
+          attributes: ['midiaId', 'url', 'tipo']
+        }
+      ]
+    });
+    
+    if (!evento) {
+      return res.status(404).json({
+        success: false,
+        message: 'Evento não encontrado'
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      evento
+    });
+  } catch (error) {
+    console.error('Erro ao buscar evento:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erro ao buscar evento',
+      error: error.message
+    });
+  }
+});
+
 http.listen(PORT, () => {
   console.log(`Servidor rodando com Socket.IO na porta: ${PORT}`);
 });
