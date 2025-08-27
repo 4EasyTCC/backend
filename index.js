@@ -6,7 +6,7 @@ const jwt = require("jsonwebtoken");
 const sequelize = require("./db");
 const multer = require("multer");
 const path = require("path");
-
+const { Op } = require('sequelize');
 const Organizador = require("./models/Organizador");
 const Evento = require("./models/Evento");
 const Localizacao = require("./models/Localizacao");
@@ -22,6 +22,50 @@ app.use("/uploads", express.static("uploads"));
 
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET;
+
+
+    const filtrarPorPeriodo = (eventos, periodo) => {
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+
+      const amanha = new Date(hoje);
+      amanha.setDate(amanha.getDate() + 1);
+
+      const finalSemana = new Date(hoje);
+      // Encontrar o próximo sábado
+      finalSemana.setDate(finalSemana.getDate() + (6 - hoje.getDay()));
+
+      const proximaSemanaInicio = new Date(hoje);
+      proximaSemanaInicio.setDate(proximaSemanaInicio.getDate() + 7);
+      const proximaSemanaFim = new Date(proximaSemanaInicio);
+      proximaSemanaFim.setDate(proximaSemanaFim.getDate() + 6);
+
+      const esteMesFim = new Date(hoje);
+      esteMesFim.setMonth(esteMesFim.getMonth() + 1);
+      esteMesFim.setDate(0); // Último dia do mês atual
+
+      return eventos.filter(evento => {
+        if (!evento.dataInicio) return false;
+
+        const dataEvento = new Date(evento.dataInicio);
+        dataEvento.setHours(0, 0, 0, 0);
+
+        switch (periodo) {
+          case 'hoje':
+            return dataEvento.getTime() === hoje.getTime();
+          case 'amanha':
+            return dataEvento.getTime() === amanha.getTime();
+          case 'esta-semana':
+            return dataEvento >= hoje && dataEvento <= finalSemana;
+          case 'proxima-semana':
+            return dataEvento >= proximaSemanaInicio && dataEvento <= proximaSemanaFim;
+          case 'este-mes':
+            return dataEvento >= hoje && dataEvento <= esteMesFim;
+          default:
+            return true;
+        }
+      });
+    };
 
 const verificarToken = async (token) => {
   try {
@@ -94,7 +138,12 @@ const storage = multer.diskStorage({
   },
 });
 
+
 const upload = multer({ storage });
+
+
+
+
 
 app.post("/cadastro/organizador", async (req, res) => {
   const { nome, email, senha } = req.body;
@@ -782,18 +831,18 @@ app.post("/mensagens/:grupoId", autenticar, async (req, res) => {
 // GET /api/eventos/filtrados
 app.get('/api/eventos/filtrados', async (req, res) => {
   try {
-    const { 
-      categoria, 
-      preco, 
-      tipo, 
-      localizacao, 
-      pagina = 1, 
-      limite = 24 
+    const {
+      categoria,
+      preco,
+      tipo,
+      localizacao,
+      pagina = 1,
+      limite = 24
     } = req.query;
-    
+
     const offset = (parseInt(pagina) - 1) * parseInt(limite);
     let whereClause = { statusEvento: 'ativo' };
-    
+
     let includeClause = [
       {
         model: Localizacao,
@@ -820,7 +869,7 @@ app.get('/api/eventos/filtrados', async (req, res) => {
 
     // Ordenação padrão (aleatória quando não há filtros)
     let orderClause = [['dataInicio', 'ASC']];
-    
+
     // Se não há filtros ativos, ordenar aleatoriamente
     if (!categoria && preco === 'qualquer' && tipo === 'qualquer' && !localizacao) {
       orderClause = [sequelize.fn('RAND')];
@@ -843,8 +892,8 @@ app.get('/api/eventos/filtrados', async (req, res) => {
 
     // Filtro por localização (busca parcial case-insensitive)
     if (localizacao && localizacao !== '') {
-      whereClause['$localizacao.cidade$'] = { 
-        [Op.iLike]: `%${localizacao}%` 
+      whereClause['$localizacao.cidade$'] = {
+        [Op.iLike]: `%${localizacao}%`
       };
     }
 
@@ -870,13 +919,13 @@ app.get('/api/eventos/filtrados', async (req, res) => {
     if (preco && preco !== 'qualquer') {
       eventosFiltrados = eventos.filter(evento => {
         const temIngressos = evento.Ingressos && evento.Ingressos.length > 0;
-        const temIngressoGratis = temIngressos && evento.Ingressos.some(ingresso => 
+        const temIngressoGratis = temIngressos && evento.Ingressos.some(ingresso =>
           parseFloat(ingresso.preco) === 0
         );
-        const temIngressoPago = temIngressos && evento.Ingressos.some(ingresso => 
+        const temIngressoPago = temIngressos && evento.Ingressos.some(ingresso =>
           parseFloat(ingresso.preco) > 0
         );
-        
+
         if (preco === 'gratis') {
           return temIngressoGratis || !temIngressos; // Considera eventos sem ingressos como gratuitos
         } else if (preco === 'pago') {
@@ -909,7 +958,7 @@ app.get('/api/eventos/categorias', async (req, res) => {
     'Infantil', 'Moda e Beleza', 'Passeios e Tours', 'Religião e Espiritualidade',
     'Saúde e Bem-Estar', 'Teatros e Espetáculos'
   ];
-  
+
   res.status(200).json(categorias);
 });
 
@@ -932,11 +981,11 @@ app.get('/api/localizacoes', async (req, res) => {
       ],
       limit: 50 // Limitar para não sobrecarregar
     });
-    
-    const cidadesFormatadas = localizacoes.map(loc => 
+
+    const cidadesFormatadas = localizacoes.map(loc =>
       loc.estado ? `${loc.cidade}, ${loc.estado}` : loc.cidade
     );
-    
+
     res.status(200).json(cidadesFormatadas);
   } catch (error) {
     console.error('Erro ao buscar localizações:', error);
@@ -947,12 +996,97 @@ app.get('/api/localizacoes', async (req, res) => {
   }
 });
 
+app.get('/api/eventos/home', async (req, res) => {
+  try {
+    const {
+      periodo,
+      categoria,
+      limite = 16
+    } = req.query;
+
+    // Cláusula WHERE básica
+    let whereClause = { statusEvento: 'ativo' };
+
+    // Cláusula INCLUDE para relacionamentos
+    let includeClause = [
+      {
+        model: Localizacao,
+        as: 'localizacao',
+        attributes: ['endereco', 'cidade', 'estado']
+      },
+      {
+        model: Organizador,
+        as: 'organizador',
+        attributes: ['nome', 'avatarUrl']
+      },
+      {
+        model: Ingresso,
+        attributes: ['preco'],
+        required: false
+      },
+      {
+        model: Midia,
+        attributes: ['url', 'tipo'],
+        where: { tipo: 'capa' },
+        required: false
+      }
+    ];
+
+    // Filtro por categoria
+    if (categoria && categoria !== '') {
+      whereClause.tipoEvento = categoria;
+    }
+
+    // Buscar eventos do banco
+    let eventos = await Evento.findAll({
+      where: whereClause,
+      include: includeClause,
+      order: [['dataInicio', 'ASC']],
+      limit: parseInt(limite) || 16
+    });
+
+    // Converter para JSON para manipulação
+    eventos = eventos.map(evento => evento.toJSON());
+
+    // Aplicar filtro de período se especificado
+    if (periodo) {
+      eventos = filtrarPorPeriodo(eventos, periodo);
+    }
+
+    // Formatar dados para resposta
+    const eventosFormatados = eventos.map(evento => ({
+      eventoId: evento.eventoId,
+      nomeEvento: evento.nomeEvento,
+      descEvento: evento.descEvento,
+      dataInicio: evento.dataInicio,
+      horaInicio: evento.horaInicio,
+      localizacao: evento.localizacao,
+      organizador: evento.organizador,
+      Ingressos: evento.Ingressos,
+      Midia: evento.Midia
+    }));
+
+    res.status(200).json({
+      success: true,
+      eventos: eventosFormatados,
+      total: eventosFormatados.length
+    });
+  } catch (error) {
+    console.error('Erro ao buscar eventos para home:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erro ao buscar eventos',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Erro interno'
+    });
+  }
+});
+
 
 // GET /api/eventos/:id - Detalhes completos de um evento
 app.get('/api/eventos/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     const evento = await Evento.findByPk(id, {
       include: [
         {
@@ -975,14 +1109,16 @@ app.get('/api/eventos/:id', async (req, res) => {
         }
       ]
     });
-    
+
+  
+
     if (!evento) {
       return res.status(404).json({
         success: false,
         message: 'Evento não encontrado'
       });
     }
-    
+
     res.status(200).json({
       success: true,
       evento
