@@ -1,6 +1,5 @@
 const { DataTypes } = require("sequelize");
 const sequelize = require("../db");
-const Evento = require("./Evento");
 const Midia = sequelize.define(
   "Midia",
   {
@@ -34,6 +33,9 @@ const Midia = sequelize.define(
   }
 );
 
+module.exports = Midia;
+
+const Evento = require("./Evento");
 Midia.belongsTo(Evento, {
   foreignKey: {
     name: "eventoId",
@@ -43,5 +45,3 @@ Midia.belongsTo(Evento, {
 Evento.hasMany(Midia, {
   foreignKey: "eventoId",
 });
-
-module.exports = Midia;

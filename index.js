@@ -313,21 +313,9 @@ app.get("/eventos", autenticar, async (req, res) => {
     const eventos = await Evento.findAll({
       where: { organizadorId: req.usuarioId },
       include: [
-        {
-          model: Localizacao,
-          as: "localizacao",
-          attributes: ["endereco", "cidade", "estado"],
-        },
-        {
-          model: Organizador,
-          as: "organizador",
-          attributes: ["organizadorId", "nome", "email"],
-        },
-        {
-          model: Midia,
-          as: "midia",
-          attributes: ["url", "tipo"],
-        },
+        { model: Organizador, as: "organizador" },
+        { model: Localizacao, as: "localizacao" },
+        { model: Midia }, // sem alias
       ],
       order: [["dataInicio", "ASC"]],
     });
@@ -344,14 +332,13 @@ app.get("/eventos", autenticar, async (req, res) => {
     res.status(200).json(eventos);
   } catch (error) {
     console.error("Erro ao buscar eventos:", error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Erro ao buscar eventos",
       error: error.message,
     });
   }
 });
-
 app.get("/perfil/organizador", autenticar, async (req, res) => {
   try {
     const organizador = await Organizador.findByPk(req.usuarioId, {
@@ -1151,119 +1138,6 @@ app.get("/api/eventos/:id", async (req, res) => {
 
 http.listen(PORT, () => {
   console.log(`Servidor rodando com Socket.IO na porta: ${PORT}`);
-});
-
-// Rota para debug - Listar todas as categorias existentes no banco
-app.get("/api/debug/categorias", async (req, res) => {
-  try {
-    const categorias = await Evento.findAll({
-      attributes: [
-        [sequelize.fn("DISTINCT", sequelize.col("tipoEvento")), "categoria"],
-      ],
-      order: [["categoria", "ASC"]],
-    });
-
-    console.log(
-      "Categorias encontradas no banco:",
-      categorias.map((c) => c.get("categoria"))
-    );
-
-    res.status(200).json({
-      success: true,
-      categorias: categorias.map((c) => c.get("categoria")),
-    });
-  } catch (error) {
-    console.error("Erro ao buscar categorias:", error);
-    res.status(500).json({
-      success: false,
-      message: "Erro ao buscar categorias",
-      error: error.message,
-    });
-  }
-});
-
-// Rota para debug - Listar todos os eventos com suas categorias
-app.get("/api/debug/eventos", async (req, res) => {
-  try {
-    const eventos = await Evento.findAll({
-      attributes: ["eventoId", "nomeEvento", "tipoEvento", "statusEvento"],
-      include: [
-        {
-          model: Localizacao,
-          as: "localizacao",
-          attributes: ["cidade", "estado"],
-        },
-      ],
-      limit: 20,
-      order: [["eventoId", "DESC"]],
-    });
-
-    console.log(
-      "Eventos encontrados:",
-      eventos.map((e) => ({
-        id: e.eventoId,
-        nome: e.nomeEvento,
-        tipo: e.tipoEvento,
-        status: e.statusEvento,
-        cidade: e.localizacao?.cidade,
-      }))
-    );
-
-    res.status(200).json({
-      success: true,
-      eventos: eventos,
-    });
-  } catch (error) {
-    console.error("Erro ao buscar eventos:", error);
-    res.status(500).json({
-      success: false,
-      message: "Erro ao buscar eventos",
-      error: error.message,
-    });
-  }
-});
-
-// Rota para debug - Testar filtro por categoria específica
-app.get("/api/debug/teste-categoria", async (req, res) => {
-  try {
-    const { categoria } = req.query;
-
-    if (!categoria) {
-      return res.status(400).json({
-        success: false,
-        message: "Parâmetro 'categoria' é obrigatório",
-      });
-    }
-
-    console.log(`Testando filtro para categoria: "${categoria}"`);
-
-    const eventos = await Evento.findAll({
-      where: {
-        tipoEvento: categoria,
-        statusEvento: "ativo",
-      },
-      attributes: ["eventoId", "nomeEvento", "tipoEvento"],
-      limit: 10,
-    });
-
-    console.log(
-      `Encontrados ${eventos.length} eventos para a categoria "${categoria}"`
-    );
-
-    res.status(200).json({
-      success: true,
-      categoria: categoria,
-      quantidade: eventos.length,
-      eventos: eventos,
-    });
-  } catch (error) {
-    console.error("Erro no teste de categoria:", error);
-    res.status(500).json({
-      success: false,
-      message: "Erro no teste de categoria",
-      error: error.message,
-    });
-  }
 });
 
 /*
