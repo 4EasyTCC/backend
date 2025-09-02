@@ -64,6 +64,24 @@ const Evento = sequelize.define(
       type: DataTypes.STRING,
       allowNull: true,
     },
+    categoria: {
+      type: DataTypes.ENUM(
+        "Arte, Cultura e Lazer",
+        "Congressos e Palestras",
+        "Cursos e Workshops",
+        "Esporte",
+        "Festas e Shows",
+        "Gastronomia",
+        "Games e Geek",
+        "Grátis",
+        "Infantil",
+        "Moda e Beleza",
+        "Passeios e Tours",
+        "Religião e Espiritualidade",
+        "Saúde e Bem-Estar",
+        "Teatros e Espetáculos"
+      ),
+    },
   },
   {
     tableName: "Evento",

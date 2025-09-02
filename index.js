@@ -6,7 +6,7 @@ const jwt = require("jsonwebtoken");
 const sequelize = require("./db");
 const multer = require("multer");
 const path = require("path");
-const { Op } = require('sequelize');
+const { Op } = require("sequelize");
 const Organizador = require("./models/Organizador");
 const Evento = require("./models/Evento");
 const Localizacao = require("./models/Localizacao");
@@ -23,49 +23,50 @@ app.use("/uploads", express.static("uploads"));
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET;
 
+const filtrarPorPeriodo = (eventos, periodo) => {
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
 
-    const filtrarPorPeriodo = (eventos, periodo) => {
-      const hoje = new Date();
-      hoje.setHours(0, 0, 0, 0);
+  const amanha = new Date(hoje);
+  amanha.setDate(amanha.getDate() + 1);
 
-      const amanha = new Date(hoje);
-      amanha.setDate(amanha.getDate() + 1);
+  const finalSemana = new Date(hoje);
+  // Encontrar o próximo sábado
+  finalSemana.setDate(finalSemana.getDate() + (6 - hoje.getDay()));
 
-      const finalSemana = new Date(hoje);
-      // Encontrar o próximo sábado
-      finalSemana.setDate(finalSemana.getDate() + (6 - hoje.getDay()));
+  const proximaSemanaInicio = new Date(hoje);
+  proximaSemanaInicio.setDate(proximaSemanaInicio.getDate() + 7);
+  const proximaSemanaFim = new Date(proximaSemanaInicio);
+  proximaSemanaFim.setDate(proximaSemanaFim.getDate() + 6);
 
-      const proximaSemanaInicio = new Date(hoje);
-      proximaSemanaInicio.setDate(proximaSemanaInicio.getDate() + 7);
-      const proximaSemanaFim = new Date(proximaSemanaInicio);
-      proximaSemanaFim.setDate(proximaSemanaFim.getDate() + 6);
+  const esteMesFim = new Date(hoje);
+  esteMesFim.setMonth(esteMesFim.getMonth() + 1);
+  esteMesFim.setDate(0); // Último dia do mês atual
 
-      const esteMesFim = new Date(hoje);
-      esteMesFim.setMonth(esteMesFim.getMonth() + 1);
-      esteMesFim.setDate(0); // Último dia do mês atual
+  return eventos.filter((evento) => {
+    if (!evento.dataInicio) return false;
 
-      return eventos.filter(evento => {
-        if (!evento.dataInicio) return false;
+    const dataEvento = new Date(evento.dataInicio);
+    dataEvento.setHours(0, 0, 0, 0);
 
-        const dataEvento = new Date(evento.dataInicio);
-        dataEvento.setHours(0, 0, 0, 0);
-
-        switch (periodo) {
-          case 'hoje':
-            return dataEvento.getTime() === hoje.getTime();
-          case 'amanha':
-            return dataEvento.getTime() === amanha.getTime();
-          case 'esta-semana':
-            return dataEvento >= hoje && dataEvento <= finalSemana;
-          case 'proxima-semana':
-            return dataEvento >= proximaSemanaInicio && dataEvento <= proximaSemanaFim;
-          case 'este-mes':
-            return dataEvento >= hoje && dataEvento <= esteMesFim;
-          default:
-            return true;
-        }
-      });
-    };
+    switch (periodo) {
+      case "hoje":
+        return dataEvento.getTime() === hoje.getTime();
+      case "amanha":
+        return dataEvento.getTime() === amanha.getTime();
+      case "esta-semana":
+        return dataEvento >= hoje && dataEvento <= finalSemana;
+      case "proxima-semana":
+        return (
+          dataEvento >= proximaSemanaInicio && dataEvento <= proximaSemanaFim
+        );
+      case "este-mes":
+        return dataEvento >= hoje && dataEvento <= esteMesFim;
+      default:
+        return true;
+    }
+  });
+};
 
 const verificarToken = async (token) => {
   try {
@@ -138,12 +139,7 @@ const storage = multer.diskStorage({
   },
 });
 
-
 const upload = multer({ storage });
-
-
-
-
 
 app.post("/cadastro/organizador", async (req, res) => {
   const { nome, email, senha } = req.body;
@@ -326,6 +322,11 @@ app.get("/eventos", autenticar, async (req, res) => {
           model: Organizador,
           as: "organizador",
           attributes: ["organizadorId", "nome", "email"],
+        },
+        {
+          model: Midia,
+          as: "midia",
+          attributes: ["url", "tipo"],
         },
       ],
       order: [["dataInicio", "ASC"]],
@@ -828,8 +829,7 @@ app.post("/mensagens/:grupoId", autenticar, async (req, res) => {
   }
 });
 
-// GET /api/eventos/filtrados
-app.get('/api/eventos/filtrados', async (req, res) => {
+app.get("/api/eventos/filtrados", async (req, res) => {
   try {
     const {
       categoria,
@@ -837,71 +837,78 @@ app.get('/api/eventos/filtrados', async (req, res) => {
       tipo,
       localizacao,
       pagina = 1,
-      limite = 24
+      limite = 24,
     } = req.query;
 
     const offset = (parseInt(pagina) - 1) * parseInt(limite);
-    let whereClause = { statusEvento: 'ativo' };
+    let whereClause = { statusEvento: "ativo" };
 
     let includeClause = [
       {
         model: Localizacao,
-        as: 'localizacao',
-        attributes: ['endereco', 'cidade', 'estado']
+        as: "localizacao",
+        attributes: ["endereco", "cidade", "estado"],
       },
       {
         model: Organizador,
-        as: 'organizador',
-        attributes: ['nome']
+        as: "organizador",
+        attributes: ["nome"],
       },
       {
         model: Ingresso,
-        attributes: ['preco'],
-        required: false // Importantíssimo: não requer ingresso para evitar excluir eventos sem ingressos
+        attributes: ["preco"],
+        required: false, // Importantíssimo: não requer ingresso para evitar excluir eventos sem ingressos
       },
       {
         model: Midia,
-        attributes: ['url'],
-        where: { tipo: 'capa' },
-        required: false
-      }
+        attributes: ["url"],
+        where: { tipo: "capa" },
+        required: false,
+      },
     ];
 
     // Ordenação padrão (aleatória quando não há filtros)
-    let orderClause = [['dataInicio', 'ASC']];
+    let orderClause = [["dataInicio", "ASC"]];
 
     // Se não há filtros ativos, ordenar aleatoriamente
-    if (!categoria && preco === 'qualquer' && tipo === 'qualquer' && !localizacao) {
-      orderClause = [sequelize.fn('RAND')];
+    if (
+      !categoria &&
+      preco === "qualquer" &&
+      tipo === "qualquer" &&
+      !localizacao
+    ) {
+      orderClause = [sequelize.fn("RAND")];
     }
 
     // Filtro por categoria (suporta múltiplas categorias)
-    if (categoria && categoria !== '') {
-      const categoriasArray = categoria.split(',');
+    if (categoria && categoria !== "") {
+      const categoriasArray = categoria.split(",");
       whereClause.tipoEvento = { [Op.in]: categoriasArray };
     }
 
     // Filtro por tipo (presencial/online)
-    if (tipo && tipo !== 'qualquer') {
-      if (tipo === 'online') {
-        whereClause['$localizacao.endereco$'] = { [Op.is]: null };
-      } else if (tipo === 'presencial') {
-        whereClause['$localizacao.endereco$'] = { [Op.not]: null };
+    if (tipo && tipo !== "qualquer") {
+      if (tipo === "online") {
+        whereClause["$localizacao.endereco$"] = { [Op.is]: null };
+      } else if (tipo === "presencial") {
+        whereClause["$localizacao.endereco$"] = { [Op.not]: null };
       }
     }
 
     // Filtro por localização (busca parcial case-insensitive)
-    if (localizacao && localizacao !== '') {
-      whereClause['$localizacao.cidade$'] = {
-        [Op.iLike]: `%${localizacao}%`
+    if (localizacao && localizacao !== "") {
+      whereClause["$localizacao.cidade$"] = {
+        [Op.iLike]: `%${localizacao}%`,
       };
     }
 
     // Primeiro: contar total de eventos para paginação
     const totalEventos = await Evento.count({
       where: whereClause,
-      include: includeClause.filter(inc => inc.model !== Ingresso && inc.model !== Midia),
-      distinct: true
+      include: includeClause.filter(
+        (inc) => inc.model !== Ingresso && inc.model !== Midia
+      ),
+      distinct: true,
     });
 
     // Segundo: buscar eventos com limites
@@ -911,24 +918,24 @@ app.get('/api/eventos/filtrados', async (req, res) => {
       order: orderClause,
       limit: parseInt(limite),
       offset: offset,
-      subQuery: false
+      subQuery: false,
     });
 
     // Filtro por preço (após buscar os eventos)
     let eventosFiltrados = eventos;
-    if (preco && preco !== 'qualquer') {
-      eventosFiltrados = eventos.filter(evento => {
+    if (preco && preco !== "qualquer") {
+      eventosFiltrados = eventos.filter((evento) => {
         const temIngressos = evento.Ingressos && evento.Ingressos.length > 0;
-        const temIngressoGratis = temIngressos && evento.Ingressos.some(ingresso =>
-          parseFloat(ingresso.preco) === 0
-        );
-        const temIngressoPago = temIngressos && evento.Ingressos.some(ingresso =>
-          parseFloat(ingresso.preco) > 0
-        );
+        const temIngressoGratis =
+          temIngressos &&
+          evento.Ingressos.some((ingresso) => parseFloat(ingresso.preco) === 0);
+        const temIngressoPago =
+          temIngressos &&
+          evento.Ingressos.some((ingresso) => parseFloat(ingresso.preco) > 0);
 
-        if (preco === 'gratis') {
+        if (preco === "gratis") {
           return temIngressoGratis || !temIngressos; // Considera eventos sem ingressos como gratuitos
-        } else if (preco === 'pago') {
+        } else if (preco === "pago") {
           return temIngressoPago;
         }
         return true;
@@ -939,101 +946,106 @@ app.get('/api/eventos/filtrados', async (req, res) => {
       eventos: eventosFiltrados,
       total: totalEventos,
       totalPaginas: Math.ceil(totalEventos / parseInt(limite)),
-      paginaAtual: parseInt(pagina)
+      paginaAtual: parseInt(pagina),
     });
   } catch (error) {
-    console.error('Erro ao buscar eventos filtrados:', error);
+    console.error("Erro ao buscar eventos filtrados:", error);
     res.status(500).json({
       success: false,
-      message: 'Erro ao buscar eventos',
-      error: error.message
+      message: "Erro ao buscar eventos",
+      error: error.message,
     });
   }
 });
 
-app.get('/api/eventos/categorias', async (req, res) => {
+app.get("/api/eventos/categorias", async (req, res) => {
   const categorias = [
-    'Arte, Cultura e Lazer', 'Congressos e Palestras', 'Cursos e Workshops',
-    'Esporte', 'Festas e Shows', 'Gastronomia', 'Games e Geek', 'Grátis',
-    'Infantil', 'Moda e Beleza', 'Passeios e Tours', 'Religião e Espiritualidade',
-    'Saúde e Bem-Estar', 'Teatros e Espetáculos'
+    "Arte, Cultura e Lazer",
+    "Congressos e Palestras",
+    "Cursos e Workshops",
+    "Esporte",
+    "Festas e Shows",
+    "Gastronomia",
+    "Games e Geek",
+    "Grátis",
+    "Infantil",
+    "Moda e Beleza",
+    "Passeios e Tours",
+    "Religião e Espiritualidade",
+    "Saúde e Bem-Estar",
+    "Teatros e Espetáculos",
   ];
 
   res.status(200).json(categorias);
 });
 
-// GET /api/localizacoes
-app.get('/api/localizacoes', async (req, res) => {
+app.get("/api/localizacoes", async (req, res) => {
   try {
     const localizacoes = await Localizacao.findAll({
       attributes: [
-        [sequelize.fn('DISTINCT', sequelize.col('cidade')), 'cidade'],
-        'estado'
+        [sequelize.fn("DISTINCT", sequelize.col("cidade")), "cidade"],
+        "estado",
       ],
       where: {
         cidade: {
-          [Op.ne]: null
-        }
+          [Op.ne]: null,
+        },
       },
       order: [
-        ['cidade', 'ASC'],
-        ['estado', 'ASC']
+        ["cidade", "ASC"],
+        ["estado", "ASC"],
       ],
-      limit: 50 // Limitar para não sobrecarregar
+      limit: 50, // Limitar para não sobrecarregar
     });
 
-    const cidadesFormatadas = localizacoes.map(loc =>
+    const cidadesFormatadas = localizacoes.map((loc) =>
       loc.estado ? `${loc.cidade}, ${loc.estado}` : loc.cidade
     );
 
     res.status(200).json(cidadesFormatadas);
   } catch (error) {
-    console.error('Erro ao buscar localizações:', error);
+    console.error("Erro ao buscar localizações:", error);
     res.status(500).json({
       success: false,
-      message: 'Erro ao buscar localizações'
+      message: "Erro ao buscar localizações",
     });
   }
 });
 
-app.get('/api/eventos/home', async (req, res) => {
+app.get("/api/eventos/home", async (req, res) => {
   try {
-    const {
-      periodo,
-      categoria,
-      limite = 16
-    } = req.query;
+    const { periodo, categoria, limite = 16 } = req.query;
 
     // Cláusula WHERE básica
-    let whereClause = { statusEvento: 'ativo' };
+    let whereClause = { statusEvento: "ativo" };
 
     // Cláusula INCLUDE para relacionamentos
     let includeClause = [
       {
         model: Localizacao,
-        as: 'localizacao',
-        attributes: ['endereco', 'cidade', 'estado']
+        as: "localizacao",
+        attributes: ["endereco", "cidade", "estado"],
       },
       {
         model: Organizador,
-        as: 'organizador',
-        attributes: ['nome', 'avatarUrl']
+        as: "organizador",
+        attributes: ["nome", "avatarUrl"],
       },
       {
         model: Ingresso,
-        attributes: ['preco'],
-        required: false
+        attributes: ["preco"],
+        required: false,
       },
       {
         model: Midia,
-        attributes: ['url', 'tipo'],
-        where: { tipo: 'capa' },
-        required: false
-      }
+        attributes: ["url", "tipo"],
+        where: { tipo: "capa" },
+        required: false,
+      },
     ];
 
     // Filtro por categoria
-    if (categoria && categoria !== '') {
+    if (categoria && categoria !== "") {
       whereClause.tipoEvento = categoria;
     }
 
@@ -1041,12 +1053,12 @@ app.get('/api/eventos/home', async (req, res) => {
     let eventos = await Evento.findAll({
       where: whereClause,
       include: includeClause,
-      order: [['dataInicio', 'ASC']],
-      limit: parseInt(limite) || 16
+      order: [["dataInicio", "ASC"]],
+      limit: parseInt(limite) || 16,
     });
 
     // Converter para JSON para manipulação
-    eventos = eventos.map(evento => evento.toJSON());
+    eventos = eventos.map((evento) => evento.toJSON());
 
     // Aplicar filtro de período se especificado
     if (periodo) {
@@ -1054,7 +1066,7 @@ app.get('/api/eventos/home', async (req, res) => {
     }
 
     // Formatar dados para resposta
-    const eventosFormatados = eventos.map(evento => ({
+    const eventosFormatados = eventos.map((evento) => ({
       eventoId: evento.eventoId,
       nomeEvento: evento.nomeEvento,
       descEvento: evento.descEvento,
@@ -1063,27 +1075,26 @@ app.get('/api/eventos/home', async (req, res) => {
       localizacao: evento.localizacao,
       organizador: evento.organizador,
       Ingressos: evento.Ingressos,
-      Midia: evento.Midia
+      Midia: evento.Midia,
     }));
 
     res.status(200).json({
       success: true,
       eventos: eventosFormatados,
-      total: eventosFormatados.length
+      total: eventosFormatados.length,
     });
   } catch (error) {
-    console.error('Erro ao buscar eventos para home:', error);
+    console.error("Erro ao buscar eventos para home:", error);
     res.status(500).json({
       success: false,
-      message: 'Erro ao buscar eventos',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Erro interno'
+      message: "Erro ao buscar eventos",
+      error:
+        process.env.NODE_ENV === "development" ? error.message : "Erro interno",
     });
   }
 });
 
-
-// GET /api/eventos/:id - Detalhes completos de um evento
-app.get('/api/eventos/:id', async (req, res) => {
+app.get("/api/eventos/:id", async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -1091,44 +1102,49 @@ app.get('/api/eventos/:id', async (req, res) => {
       include: [
         {
           model: Localizacao,
-          as: 'localizacao',
-          attributes: ['endereco', 'cidade', 'estado', 'cep', 'complemento']
+          as: "localizacao",
+          attributes: ["endereco", "cidade", "estado", "cep", "complemento"],
         },
         {
           model: Organizador,
-          as: 'organizador',
-          attributes: ['organizadorId', 'nome', 'email', 'avatarUrl']
+          as: "organizador",
+          attributes: ["organizadorId", "nome", "email", "avatarUrl"],
         },
         {
           model: Ingresso,
-          attributes: ['ingressoId', 'nome', 'descricao', 'preco', 'quantidade', 'dataLimite']
+          attributes: [
+            "ingressoId",
+            "nome",
+            "descricao",
+            "preco",
+            "quantidade",
+            "dataLimite",
+          ],
         },
         {
           model: Midia,
-          attributes: ['midiaId', 'url', 'tipo']
-        }
-      ]
+          attributes: ["midiaId", "url", "tipo"],
+        },
+      ],
     });
-
-  
 
     if (!evento) {
       return res.status(404).json({
         success: false,
-        message: 'Evento não encontrado'
+        message: "Evento não encontrado",
       });
     }
 
     res.status(200).json({
       success: true,
-      evento
+      evento,
     });
   } catch (error) {
-    console.error('Erro ao buscar evento:', error);
+    console.error("Erro ao buscar evento:", error);
     res.status(500).json({
       success: false,
-      message: 'Erro ao buscar evento',
-      error: error.message
+      message: "Erro ao buscar evento",
+      error: error.message,
     });
   }
 });
@@ -1137,6 +1153,278 @@ http.listen(PORT, () => {
   console.log(`Servidor rodando com Socket.IO na porta: ${PORT}`);
 });
 
+// Rota para debug - Listar todas as categorias existentes no banco
+app.get("/api/debug/categorias", async (req, res) => {
+  try {
+    const categorias = await Evento.findAll({
+      attributes: [
+        [sequelize.fn("DISTINCT", sequelize.col("tipoEvento")), "categoria"],
+      ],
+      order: [["categoria", "ASC"]],
+    });
+
+    console.log(
+      "Categorias encontradas no banco:",
+      categorias.map((c) => c.get("categoria"))
+    );
+
+    res.status(200).json({
+      success: true,
+      categorias: categorias.map((c) => c.get("categoria")),
+    });
+  } catch (error) {
+    console.error("Erro ao buscar categorias:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erro ao buscar categorias",
+      error: error.message,
+    });
+  }
+});
+
+// Rota para debug - Listar todos os eventos com suas categorias
+app.get("/api/debug/eventos", async (req, res) => {
+  try {
+    const eventos = await Evento.findAll({
+      attributes: ["eventoId", "nomeEvento", "tipoEvento", "statusEvento"],
+      include: [
+        {
+          model: Localizacao,
+          as: "localizacao",
+          attributes: ["cidade", "estado"],
+        },
+      ],
+      limit: 20,
+      order: [["eventoId", "DESC"]],
+    });
+
+    console.log(
+      "Eventos encontrados:",
+      eventos.map((e) => ({
+        id: e.eventoId,
+        nome: e.nomeEvento,
+        tipo: e.tipoEvento,
+        status: e.statusEvento,
+        cidade: e.localizacao?.cidade,
+      }))
+    );
+
+    res.status(200).json({
+      success: true,
+      eventos: eventos,
+    });
+  } catch (error) {
+    console.error("Erro ao buscar eventos:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erro ao buscar eventos",
+      error: error.message,
+    });
+  }
+});
+
+// Rota para debug - Testar filtro por categoria específica
+app.get("/api/debug/teste-categoria", async (req, res) => {
+  try {
+    const { categoria } = req.query;
+
+    if (!categoria) {
+      return res.status(400).json({
+        success: false,
+        message: "Parâmetro 'categoria' é obrigatório",
+      });
+    }
+
+    console.log(`Testando filtro para categoria: "${categoria}"`);
+
+    const eventos = await Evento.findAll({
+      where: {
+        tipoEvento: categoria,
+        statusEvento: "ativo",
+      },
+      attributes: ["eventoId", "nomeEvento", "tipoEvento"],
+      limit: 10,
+    });
+
+    console.log(
+      `Encontrados ${eventos.length} eventos para a categoria "${categoria}"`
+    );
+
+    res.status(200).json({
+      success: true,
+      categoria: categoria,
+      quantidade: eventos.length,
+      eventos: eventos,
+    });
+  } catch (error) {
+    console.error("Erro no teste de categoria:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erro no teste de categoria",
+      error: error.message,
+    });
+  }
+});
+
+/*
+async function seedEvents() {
+  try {
+    // Primeiro, vamos verificar se existe um organizador
+    let organizador = await Organizador.findOne();
+
+    if (!organizador) {
+      // Criar um organizador padrão se não existir
+      organizador = await Organizador.create({
+        nome: "Organizador Exemplo",
+        email: "organizador@exemplo.com",
+        senha: "senha123",
+      });
+    }
+
+    // Criar localizações
+    const localizacoes = await Localizacao.bulkCreate([
+      {
+        endereco: "Avenida Paulista, 1000",
+        cidade: "São Paulo",
+        estado: "SP",
+        cep: "01310-100",
+        latitude: -23.563099,
+        longitude: -46.654279,
+      },
+      {
+        endereco: "Praça da Liberdade, 100",
+        cidade: "Belo Horizonte",
+        estado: "MG",
+        cep: "30140-010",
+        latitude: -19.934937,
+        longitude: -43.938424,
+      },
+      {
+        endereco: "Praia de Copacabana, 200",
+        cidade: "Rio de Janeiro",
+        estado: "RJ",
+        cep: "22070-010",
+        latitude: -22.971177,
+        longitude: -43.182543,
+      },
+    ]);
+
+    // Criar eventos
+    const eventos = await Evento.bulkCreate([
+      {
+        nomeEvento: "Festival de Música Verão 2024",
+        descEvento:
+          "Um incrível festival com as melhores bandas nacionais e internacionais",
+        tipoEvento: "Festas e Shows",
+        privacidadeEvento: "Público",
+        dataInicio: "2024-02-15",
+        horaInicio: "16:00:00",
+        dataFim: "2024-02-16",
+        horaFim: "02:00:00",
+        statusEvento: "ativo",
+        categoria: "Festas e Shows",
+        localizacaoId: localizacoes[2].localizacaoId,
+        organizadorId: organizador.organizadorId,
+      },
+      {
+        nomeEvento: "Workshop de Gastronomia Italiana",
+        descEvento: "Aprenda a fazer massas e molhos autênticos da Itália",
+        tipoEvento: "Gastronomia",
+        privacidadeEvento: "Público",
+        dataInicio: "2024-03-10",
+        horaInicio: "14:00:00",
+        dataFim: "2024-03-10",
+        horaFim: "18:00:00",
+        statusEvento: "ativo",
+        categoria: "Gastronomia",
+        localizacaoId: localizacoes[0].localizacaoId,
+        organizadorId: organizador.organizadorId,
+      },
+      {
+        nomeEvento: "Maratona de São Paulo",
+        descEvento: "Corrida de 42km pelas principais ruas da cidade",
+        tipoEvento: "Esporte",
+        privacidadeEvento: "Público",
+        dataInicio: "2024-04-07",
+        horaInicio: "06:00:00",
+        dataFim: "2024-04-07",
+        horaFim: "12:00:00",
+        statusEvento: "ativo",
+        categoria: "Esporte",
+        localizacaoId: localizacoes[0].localizacaoId,
+        organizadorId: organizador.organizadorId,
+      },
+    ]);
+
+    // Adicionar mídias (usando a imagem fornecida)
+    await Midia.bulkCreate([
+      {
+        eventoId: eventos[0].eventoId,
+        url: "/uploads/evento1.jpeg",
+        tipo: "capa",
+      },
+      {
+        eventoId: eventos[1].eventoId,
+        url: "/uploads/evento2.jpeg",
+        tipo: "capa",
+      },
+      {
+        eventoId: eventos[2].eventoId,
+        url: "/uploads/evento3.jpeg",
+        tipo: "capa",
+      },
+    ]);
+
+    // Adicionar ingressos
+    await Ingresso.bulkCreate([
+      {
+        eventoId: eventos[0].eventoId,
+        nome: "Pista",
+        descricao: "Acesso à área principal do festival",
+        preco: 150.0,
+        quantidade: 5000,
+        dataLimite: "2024-02-14",
+      },
+      {
+        eventoId: eventos[0].eventoId,
+        nome: "VIP",
+        descricao: "Área exclusiva com open bar e comida",
+        preco: 350.0,
+        quantidade: 1000,
+        dataLimite: "2024-02-14",
+      },
+      {
+        eventoId: eventos[1].eventoId,
+        nome: "Participante",
+        descricao: "Inclui todos os materiais e degustação",
+        preco: 200.0,
+        quantidade: 20,
+        dataLimite: "2024-03-08",
+      },
+      {
+        eventoId: eventos[2].eventoId,
+        nome: "Corredor",
+        descricao: "Inscrição para a maratona completa",
+        preco: 120.0,
+        quantidade: 1000,
+        dataLimite: "2024-04-01",
+      },
+    ]);
+
+    console.log("Eventos criados com sucesso!");
+    console.log(
+      `Foram criados ${eventos.length} eventos com a imagem fornecida.`
+    );
+  } catch (error) {
+    console.error("Erro ao criar eventos:", error);
+  } finally {
+    await sequelize.close();
+  }
+}
+
+// Executar o script
+seedEvents();
+*/
 sequelize
   .sync({ force: false })
   .then(() => {
