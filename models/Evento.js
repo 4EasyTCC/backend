@@ -34,11 +34,6 @@ const Evento = sequelize.define(
       type: DataTypes.STRING(500),
       allowNull: true,
     },
-    tipoEvento: {
-      type: DataTypes.STRING(50),
-      allowNull: false,
-      defaultValue: "Outro",
-    },
     privacidadeEvento: {
       type: DataTypes.STRING(20),
       allowNull: false,
