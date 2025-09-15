@@ -1084,6 +1084,7 @@ app.get("/api/eventos/home", async (req, res) => {
 app.get("/api/eventos/:id", async (req, res) => {
   try {
     const { id } = req.params;
+    console.log(`[BACKEND] Recebida requisição para o evento ID: ${id}`);
 
     const evento = await Evento.findByPk(id, {
       include: [
@@ -1107,35 +1108,40 @@ app.get("/api/eventos/:id", async (req, res) => {
             "quantidade",
             "dataLimite",
           ],
+          required: false,
         },
         {
           model: Midia,
           attributes: ["midiaId", "url", "tipo"],
+          required: false,
         },
       ],
     });
 
     if (!evento) {
+      console.log(`[BACKEND] Evento com ID ${id} não encontrado.`);
       return res.status(404).json({
         success: false,
         message: "Evento não encontrado",
       });
     }
 
+    console.log(
+      `[BACKEND] Evento com ID ${id} encontrado. Enviando resposta...`
+    );
     res.status(200).json({
       success: true,
       evento,
     });
   } catch (error) {
-    console.error("Erro ao buscar evento:", error);
+    console.error("[BACKEND] Erro ao buscar evento:", error);
     res.status(500).json({
       success: false,
-      message: "Erro ao buscar evento",
+      message: "Erro interno do servidor",
       error: error.message,
     });
   }
 });
-
 http.listen(PORT, () => {
   console.log(`Servidor rodando com Socket.IO na porta: ${PORT}`);
 });
