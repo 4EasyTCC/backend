@@ -22,7 +22,6 @@ app.use("/uploads", express.static("uploads"));
 
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET;
-
 const filtrarPorPeriodo = (eventos, periodo) => {
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
@@ -248,7 +247,7 @@ app.post("/eventos", autenticar, async (req, res) => {
     const evento = await Evento.create({
       nomeEvento: nome,
       descEvento: descricao,
-      tipoEvento: tipo,
+      categoria: tipo,
       privacidadeEvento: privacidade,
       dataInicio,
       dataFim: dataFim || dataInicio,
@@ -870,7 +869,7 @@ app.get("/api/eventos/filtrados", async (req, res) => {
     // Filtro por categoria (suporta múltiplas categorias)
     if (categoria && categoria !== "") {
       const categoriasArray = categoria.split(",");
-      whereClause.tipoEvento = { [Op.in]: categoriasArray };
+      whereClause.categoria = { [Op.in]: categoriasArray };
     }
 
     // Filtro por tipo (presencial/online)
@@ -1033,7 +1032,7 @@ app.get("/api/eventos/home", async (req, res) => {
 
     // Filtro por categoria
     if (categoria && categoria !== "") {
-      whereClause.tipoEvento = categoria;
+      whereClause.categoria = categoria;
     }
 
     // Buscar eventos do banco
@@ -1195,42 +1194,39 @@ async function seedEvents() {
         nomeEvento: "Festival de Música Verão 2024",
         descEvento:
           "Um incrível festival com as melhores bandas nacionais e internacionais",
-        tipoEvento: "Festas e Shows",
+        categoria: "Festas e Shows",
         privacidadeEvento: "Público",
         dataInicio: "2024-02-15",
         horaInicio: "16:00:00",
         dataFim: "2024-02-16",
         horaFim: "02:00:00",
         statusEvento: "ativo",
-        categoria: "Festas e Shows",
-        localizacaoId: localizacoes[2].localizacaoId,
+=        localizacaoId: localizacoes[2].localizacaoId,
         organizadorId: organizador.organizadorId,
       },
       {
         nomeEvento: "Workshop de Gastronomia Italiana",
         descEvento: "Aprenda a fazer massas e molhos autênticos da Itália",
-        tipoEvento: "Gastronomia",
+        categoria: "Gastronomia",
         privacidadeEvento: "Público",
         dataInicio: "2024-03-10",
         horaInicio: "14:00:00",
         dataFim: "2024-03-10",
         horaFim: "18:00:00",
         statusEvento: "ativo",
-        categoria: "Gastronomia",
         localizacaoId: localizacoes[0].localizacaoId,
         organizadorId: organizador.organizadorId,
       },
       {
         nomeEvento: "Maratona de São Paulo",
         descEvento: "Corrida de 42km pelas principais ruas da cidade",
-        tipoEvento: "Esporte",
+        categoria: "Esporte",
         privacidadeEvento: "Público",
         dataInicio: "2024-04-07",
         horaInicio: "06:00:00",
         dataFim: "2024-04-07",
         horaFim: "12:00:00",
         statusEvento: "ativo",
-        categoria: "Esporte",
         localizacaoId: localizacoes[0].localizacaoId,
         organizadorId: organizador.organizadorId,
       },
