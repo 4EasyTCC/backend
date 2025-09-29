@@ -1141,9 +1141,93 @@ app.get("/api/eventos/:id", async (req, res) => {
     });
   }
 });
+
+// Atualizar perfil do convidado
+app.put("/perfil/convidado", autenticar, async (req, res) => {
+  try {
+    if (req.tipoUsuario !== "convidado") {
+      return res.status(403).json({
+        success: false,
+        message: "Acesso não autorizado",
+      });
+    }
+
+    const { nome, sobreMim } = req.body;
+    
+    const camposParaAtualizar = {};
+    if (nome) camposParaAtualizar.nome = nome;
+    if (sobreMim !== undefined) camposParaAtualizar.sobreMim = sobreMim;
+
+    await Convidado.update(camposParaAtualizar, {
+      where: { convidadoId: req.usuarioId }
+    });
+
+    const convidadoAtualizado = await Convidado.findByPk(req.usuarioId, {
+      attributes: ["convidadoId", "nome", "email", "avatarUrl", "sobreMim"]
+    });
+
+    res.json({
+      success: true,
+      message: "Perfil atualizado com sucesso",
+      convidado: convidadoAtualizado
+    });
+  } catch (error) {
+    console.error("Erro ao atualizar perfil:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erro ao atualizar perfil"
+    });
+  }
+});
+
+// Upload de foto para convidado
+app.put(
+  "/perfil/convidado/foto",
+  autenticar,
+  upload.single("avatar"),
+  async (req, res) => {
+    try {
+      if (req.tipoUsuario !== "convidado") {
+        return res.status(403).json({
+          success: false,
+          message: "Acesso não autorizado",
+        });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: "Nenhuma imagem enviada",
+        });
+      }
+
+      const avatarUrl = `/uploads/${req.file.filename}`;
+
+      await Convidado.update(
+        { avatarUrl },
+        { where: { convidadoId: req.usuarioId } }
+      );
+
+      res.json({
+        success: true,
+        message: "Foto atualizada com sucesso",
+        avatarUrl,
+      });
+    } catch (error) {
+      console.error("Erro ao atualizar foto:", error);
+      res.status(500).json({
+        success: false,
+        message: "Erro ao processar foto",
+        error: error.message,
+      });
+    }
+  }
+);
+
 http.listen(PORT, () => {
   console.log(`Servidor rodando com Socket.IO na porta: ${PORT}`);
 });
+
 
 /*
 async function seedEvents() {
@@ -1201,7 +1285,7 @@ async function seedEvents() {
         dataFim: "2024-02-16",
         horaFim: "02:00:00",
         statusEvento: "ativo",
-=        localizacaoId: localizacoes[2].localizacaoId,
+        localizacaoId: localizacoes[2].localizacaoId,
         organizadorId: organizador.organizadorId,
       },
       {
