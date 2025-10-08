@@ -1103,6 +1103,7 @@ app.get("/api/eventos/:id", async (req, res) => {
 });
 
 // Atualizar perfil do convidado
+// CORREÇÃO: Buscar todos os campos exceto senha
 app.put("/perfil/convidado", autenticar, async (req, res) => {
   try {
     if (req.tipoUsuario !== "convidado") {
@@ -1112,30 +1113,62 @@ app.put("/perfil/convidado", autenticar, async (req, res) => {
       });
     }
 
-    const { nome, sobreMim } = req.body;
+    const { 
+      nome, 
+      sobreMim, 
+      telefone, 
+      dataNascimento, 
+      endereco, 
+      cidade, 
+      cep,
+      senha,
+      genero
+    } = req.body;
     
     const camposParaAtualizar = {};
-    if (nome) camposParaAtualizar.nome = nome;
+    
+    // Campos básicos
+    if (nome !== undefined) camposParaAtualizar.nome = nome;
     if (sobreMim !== undefined) camposParaAtualizar.sobreMim = sobreMim;
+    if (genero !== undefined) camposParaAtualizar.genero = genero;
+    
+    // Contato
+    if (telefone !== undefined) camposParaAtualizar.telefone = telefone?.replace(/\D/g, "") || null;
+    if (dataNascimento !== undefined) camposParaAtualizar.dataNascimento = dataNascimento;
+    
+    // Endereço
+    if (endereco !== undefined) camposParaAtualizar.endereco = endereco;
+    if (cidade !== undefined) camposParaAtualizar.cidade = cidade;
+    if (cep !== undefined) camposParaAtualizar.cep = cep?.replace(/\D/g, "") || null;
+    
+    // Senha (se fornecida)
+    if (senha && senha.trim() !== '') {
+      camposParaAtualizar.senha = senha;
+    }
 
     await Convidado.update(camposParaAtualizar, {
       where: { convidadoId: req.usuarioId }
     });
 
-    const convidadoAtualizado = await Convidado.findByPk(req.usuarioId, {
-      attributes: ["convidadoId", "nome", "email", "avatarUrl", "sobreMim"]
+    // ✅ CORREÇÃO: Buscar TODOS os campos exceto senha
+    const convidado = await Convidado.findByPk(req.usuarioId, {
+      attributes: [ 
+        'convidadoId', 'nome', 'email', 'cpf', 'telefone', 'genero', 
+        'dataNascimento', 'endereco', 'cidade', 'cep', 'avatarUrl', 'sobreMim'
+      ]
     });
 
     res.json({
       success: true,
       message: "Perfil atualizado com sucesso",
-      convidado: convidadoAtualizado
+      convidado: convidado
     });
   } catch (error) {
     console.error("Erro ao atualizar perfil:", error);
     res.status(500).json({
       success: false,
-      message: "Erro ao atualizar perfil"
+      message: "Erro ao atualizar perfil",
+      error: error.message
     });
   }
 });
@@ -1168,10 +1201,16 @@ app.put(
         { where: { convidadoId: req.usuarioId } }
       );
 
+      // ✅ CORREÇÃO: Buscar convidado atualizado para retornar dados completos
+      const convidado = await Convidado.findByPk(req.usuarioId, {
+        attributes: ["convidadoId", "nome", "email", "avatarUrl", "sobreMim"]
+      });
+
       res.json({
         success: true,
         message: "Foto atualizada com sucesso",
         avatarUrl,
+        convidado: convidado // ✅ RETORNAR USUÁRIO COMPLETO
       });
     } catch (error) {
       console.error("Erro ao atualizar foto:", error);
