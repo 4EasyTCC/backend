@@ -1,3 +1,4 @@
+// index.js (Backend)
 require("dotenv").config();
 const express = require("express");
 const app = express();
@@ -15,6 +16,8 @@ const Ingresso = require("./models/Ingresso");
 const Convidado = require("./models/Convidado");
 const Mensagem = require("./models/Mensagem");
 const Grupo = require("./models/Grupo");
+const Participacao = require("./models/Participacao");
+const MembrosGrupo = require("./models/MembrosGrupo"); 
 
 app.use(cors());
 app.use(express.json());
@@ -290,6 +293,10 @@ app.post("/eventos", autenticar, async (req, res) => {
         eventoId: evento.eventoId,
         organizadorId: req.usuarioId,
       });
+
+      // NOVO: Adicionar o organizador como membro do grupo (usando MembrosGrupo)
+      // Como a tabela MembrosGrupo foi feita focando em convidado, apenas criaremos o grupo.
+      // A rota de mensagens já permite ao organizador enviar.
     }
 
     res.status(201).json({
@@ -650,56 +657,9 @@ io.on("connection", (socket) => {
     console.log("Usuário desconectado:", socket.id);
   });
 });
-app.get("/grupos", autenticar, async (req, res) => {
-  try {
-    console.log(
-      `Buscando grupos para usuário: ${req.usuarioId}, tipo: ${req.tipoUsuario}`
-    );
 
-    let grupos;
+// REMOVIDA ROTA ANTIGA /grupos DE ORGANIZADOR
 
-    if (req.tipoUsuario === "organizador") {
-      console.log("Buscando grupos do organizador");
-      grupos = await Grupo.findAll({
-        where: { organizadorId: req.usuarioId },
-        include: [
-          {
-            model: Evento,
-            as: "evento",
-            attributes: ["nomeEvento", "dataInicio"],
-            required: false,
-          },
-        ],
-      });
-    } else {
-      console.log("Buscando todos os grupos (convidado)");
-      grupos = await Grupo.findAll({
-        include: [
-          {
-            model: Evento,
-            as: "evento",
-            attributes: ["nomeEvento", "dataInicio"],
-            required: false,
-          },
-        ],
-      });
-    }
-
-    console.log(`Encontrados ${grupos.length} grupos`);
-
-    res.json({
-      success: true,
-      grupos: grupos || [],
-    });
-  } catch (error) {
-    console.error("Erro detalhado ao buscar grupos:", error);
-    res.status(500).json({
-      success: false,
-      message: "Erro interno ao buscar grupos",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
-    });
-  }
-});
 app.get("/mensagens/:grupoId", autenticar, async (req, res) => {
   try {
     const { grupoId } = req.params;
@@ -1223,6 +1183,265 @@ app.put(
     }
   }
 );
+
+// ROTA POST PARA PARTICIPAR (MANTIDA)
+app.post("/participar/evento/:ingressoId", autenticar, async (req, res) => {
+  try {
+    const { ingressoId } = req.params;
+
+    // 1. Verificar se o usuário é um Convidado
+    if (req.tipoUsuario !== "convidado") {
+      return res.status(403).json({
+        success: false,
+        message: "Apenas convidados podem participar de eventos desta forma.",
+      });
+    }
+
+    // 2. Verificar se o ingresso existe
+    const ingresso = await Ingresso.findByPk(ingressoId);
+    if (!ingresso) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Ingresso não encontrado." });
+    }
+
+    // 3. Verificar se o convidado já possui uma participação para este ingresso
+    const participacaoExistente = await Participacao.findOne({
+      where: {
+        convidadoId: req.usuarioId,
+        ingressoId: ingressoId,
+      },
+    });
+
+    if (participacaoExistente) {
+      // Se a participação já existe e está Confirmada, retorna sucesso.
+      if (participacaoExistente.statusPagamento === 'Confirmado') {
+        return res.status(200).json({
+          success: true,
+          message: "Participação já confirmada.",
+          participacao: participacaoExistente,
+        });
+      }
+      // Se estiver Pendente/Cancelada, a lógica de negócio deve decidir se atualiza.
+      // Por simplicidade, vamos considerar uma nova compra.
+      // Você pode adicionar lógica de atualização se necessário.
+    }
+    
+    // Simulação: Gera um código de transação fictício
+    const codigoTransacao = `TRANS-${Date.now()}-${req.usuarioId}`;
+
+    // 4. Criar o registro de Participação (Simulando pagamento 'Confirmado')
+    const novaParticipacao = await Participacao.create({
+      convidadoId: req.usuarioId,
+      ingressoId: ingressoId,
+      statusPagamento: 'Confirmado', // SIMULAÇÃO: Pagamento bem-sucedido
+      codigoTransacao: codigoTransacao,
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "Participação confirmada com sucesso (Simulação de Pagamento).",
+      participacao: novaParticipacao,
+      // Retorna o eventoId para a próxima chamada de adesão ao grupo
+      eventoId: ingresso.eventoId,
+    });
+
+  } catch (error) {
+    console.error("Erro ao registrar participação:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erro interno ao registrar participação.",
+      error: error.message,
+    });
+  }
+});
+// ROTA GET PARA STATUS DE PARTICIPAÇÃO (MANTIDA)
+app.get("/participacao/evento/:eventoId", autenticar, async (req, res) => {
+  try {
+    const { eventoId } = req.params;
+
+    if (req.tipoUsuario !== "convidado") {
+      return res.status(200).json({ status: "Não Aplicável" });
+    }
+
+    // Busca ingressos relacionados ao evento
+    const ingressosEvento = await Ingresso.findAll({
+        where: { eventoId },
+        attributes: ['ingressoId']
+    });
+    const ingressoIds = ingressosEvento.map(ing => ing.ingressoId);
+
+    if (ingressoIds.length === 0) {
+        return res.status(200).json({ status: "Não Participa" });
+    }
+
+    // Busca a participação do convidado para qualquer um desses ingressos
+    const participacao = await Participacao.findOne({
+      where: {
+        convidadoId: req.usuarioId,
+        ingressoId: {
+            [Op.in]: ingressoIds
+        },
+        statusPagamento: 'Confirmado'
+      },
+      order: [['createdAt', 'DESC']]
+    });
+
+    const status = participacao ? 'Participa' : 'Não Participa';
+    
+    res.status(200).json({ status });
+  } catch (error) {
+    console.error("Erro ao buscar status de participação:", error);
+    res.status(500).json({ success: false, message: "Erro interno" });
+  }
+});
+
+// FUNÇÃO AUXILIAR PARA VERIFICAR SE É CONVIDADO
+const verifyConvidadoMiddleware = async (req, res, next) => {
+  try {
+    const token = req.headers.authorization?.replace("Bearer ", "");
+    if (!token) {
+        return res.status(401).send("Acesso negado: Token ausente.");
+    }
+    
+    const usuario = await verificarToken(token);
+    
+    if (!usuario || !(usuario instanceof Convidado)) {
+        return res.status(403).send("Acesso negado: Somente convidados.");
+    }
+    
+    req.usuario = usuario;
+    req.usuarioId = usuario.convidadoId;
+    next();
+  } catch (error) {
+    return res.status(401).send("Acesso negado: Token inválido.");
+  }
+};
+
+
+// NOVA ROTA POST: ADERIR AO GRUPO APÓS COMPRA
+app.post("/grupos/aderir", verifyConvidadoMiddleware, async (req, res) => {
+  const { eventoId } = req.body;
+  const convidadoId = req.usuarioId;
+
+  try {
+    // 1. Encontrar o grupo associado ao evento
+    const grupo = await Grupo.findOne({ 
+      where: { eventoId, tipo: 'evento' },
+      attributes: ['grupoId', 'nome']
+    });
+
+    if (!grupo) {
+      return res.status(404).json({ message: "Grupo de chat não encontrado para este evento." });
+    }
+
+    // 2. Verificar se o convidado já é membro
+    const membroExistente = await MembrosGrupo.findOne({
+      where: {
+        grupoId: grupo.grupoId,
+        convidadoId: convidadoId,
+      },
+    });
+
+    if (membroExistente) {
+      return res.status(200).json({
+        message: "Convidado já é membro do grupo.",
+        grupoId: grupo.grupoId
+      });
+    }
+
+    // 3. Adicionar o convidado como membro
+    await MembrosGrupo.create({
+      grupoId: grupo.grupoId,
+      convidadoId: convidadoId,
+    });
+
+    res.status(201).json({
+      message: "Convidado adicionado ao grupo com sucesso!",
+      grupoId: grupo.grupoId,
+      grupoNome: grupo.nome
+    });
+
+  } catch (error) {
+    console.error("Erro ao aderir ao grupo:", error);
+    res.status(500).json({ message: "Erro interno do servidor." });
+  }
+});
+
+
+// NOVA ROTA GET: LISTAR GRUPOS DO CONVIDADO LOGADO
+app.get("/grupos/convidado", verifyConvidadoMiddleware, async (req, res) => {
+    const convidadoId = req.usuarioId;
+
+    try {
+        // Busca as associações de membro do convidado
+        const membros = await MembrosGrupo.findAll({
+            where: { convidadoId },
+            include: [{
+                model: Grupo,
+                as: 'grupo',
+                attributes: ['grupoId', 'nome', 'descricao', 'eventoId'],
+                // Inclui o nome do Evento associado
+                include: [{
+                    model: Evento,
+                    as: 'evento',
+                    attributes: ['nomeEvento'] 
+                }]
+            }],
+        });
+        
+        // Formata o resultado para enviar apenas os dados do grupo
+        const gruposFormatados = membros.map(membro => ({
+            grupoId: membro.grupo.grupoId,
+            nome: membro.grupo.nome,
+            descricao: membro.grupo.descricao,
+            eventoNome: membro.grupo.evento ? membro.grupo.evento.nomeEvento : 'Evento Removido'
+        }));
+
+        res.json({ success: true, grupos: gruposFormatados });
+
+    } catch (error) {
+        console.error("Erro ao buscar grupos do convidado:", error);
+        res.status(500).json({ success: false, message: "Erro interno do servidor." });
+    }
+});
+
+
+// ROTA ANTIGA /grupos CORRIGIDA (AGORA SOMENTE ORGANIZADOR)
+app.get("/grupos/organizador", autenticar, async (req, res) => {
+  try {
+    if (req.tipoUsuario !== "organizador") {
+      return res.status(403).json({ success: false, message: "Acesso negado." });
+    }
+
+    console.log("Buscando grupos criados pelo organizador");
+    const grupos = await Grupo.findAll({
+      where: { organizadorId: req.usuarioId },
+      include: [
+        {
+          model: Evento,
+          as: "evento",
+          attributes: ["nomeEvento", "dataInicio"],
+          required: false,
+        },
+      ],
+    });
+
+    console.log(`Encontrados ${grupos.length} grupos`);
+
+    res.json({
+      success: true,
+      grupos: grupos || [],
+    });
+  } catch (error) {
+    console.error("Erro detalhado ao buscar grupos:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erro interno ao buscar grupos",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
+  }
+});
 
 http.listen(PORT, () => {
   console.log(`Servidor rodando com Socket.IO na porta: ${PORT}`);
