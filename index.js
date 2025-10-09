@@ -558,46 +558,51 @@ app.post("/login/convidado", async (req, res) => {
     });
   }
 });
+// CORREÇÃO: Atualize a rota GET /perfil/convidado no backend
 app.get("/perfil/convidado", autenticar, async (req, res) => {
   try {
     const convidado = await Convidado.findByPk(req.usuarioId, {
-      attributes: ["convidadoId", "nome", "email", "avatarUrl", "sobreMim"],
+      // ✅ CORREÇÃO: Adicionar TODOS os campos necessários
+      attributes: [
+        'convidadoId', 'nome', 'email', 'cpf', 'telefone', 'genero', 
+        'dataNascimento', 'endereco', 'cidade', 'cep', 'avatarUrl', 'sobreMim'
+      ],
     });
 
     if (!convidado) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Convidado não encontrado" });
+      return res.status(404).json({ 
+        success: false, 
+        message: "Convidado não encontrado" 
+      });
     }
 
-    const estatisticas = {
-      amigos: 10,
-      eventos: 10,
-      notificacoes: 10,
-      avaliacoes: 10,
-      categoriaMaisFrequente: "Festivais",
-      localMaisVisitado: "Etasp",
-    };
-
-    const eventosFavoritos = Array(6).fill({
-      nome: "Evento X",
-      imagem: "/uploads/evento.png",
-    });
-    const profissoesFavoritas = Array(6).fill({
-      nome: "DJ",
-      imagem: "/uploads/profissao.png",
-    });
-
+    // ✅ CORREÇÃO: Retornar estrutura consistente
     res.json({
       success: true,
-      convidado,
-      estatisticas,
-      eventosFavoritos,
-      profissoesFavoritas,
+      convidado: convidado, // Agora com todos os campos
+      estatisticas: {
+        amigos: 10,
+        eventos: 10,
+        notificacoes: 10,
+        avaliacoes: 10,
+        categoriaMaisFrequente: "Festivais",
+        localMaisVisitado: "Etasp",
+      },
+      eventosFavoritos: Array(6).fill({
+        nome: "Evento X",
+        imagem: "/uploads/evento.png",
+      }),
+      profissoesFavoritas: Array(6).fill({
+        nome: "DJ",
+        imagem: "/uploads/profissao.png",
+      }),
     });
   } catch (error) {
     console.error("Erro ao buscar perfil:", error);
-    res.status(500).json({ success: false, message: "Erro ao buscar perfil" });
+    res.status(500).json({ 
+      success: false, 
+      message: "Erro ao buscar perfil" 
+    });
   }
 });
 
@@ -1128,21 +1133,16 @@ app.put("/perfil/convidado", autenticar, async (req, res) => {
     
     const camposParaAtualizar = {};
     
-    // Campos básicos
+    // ✅ Certifique-se que todos os campos estão sendo mapeados
     if (nome !== undefined) camposParaAtualizar.nome = nome;
     if (sobreMim !== undefined) camposParaAtualizar.sobreMim = sobreMim;
     if (genero !== undefined) camposParaAtualizar.genero = genero;
-    
-    // Contato
     if (telefone !== undefined) camposParaAtualizar.telefone = telefone?.replace(/\D/g, "") || null;
     if (dataNascimento !== undefined) camposParaAtualizar.dataNascimento = dataNascimento;
-    
-    // Endereço
     if (endereco !== undefined) camposParaAtualizar.endereco = endereco;
     if (cidade !== undefined) camposParaAtualizar.cidade = cidade;
     if (cep !== undefined) camposParaAtualizar.cep = cep?.replace(/\D/g, "") || null;
     
-    // Senha (se fornecida)
     if (senha && senha.trim() !== '') {
       camposParaAtualizar.senha = senha;
     }
@@ -1151,8 +1151,8 @@ app.put("/perfil/convidado", autenticar, async (req, res) => {
       where: { convidadoId: req.usuarioId }
     });
 
-    // ✅ CORREÇÃO: Buscar TODOS os campos exceto senha
-    const convidado = await Convidado.findByPk(req.usuarioId, {
+    // ✅ BUSCAR TODOS OS CAMPOS ATUALIZADOS
+    const convidadoAtualizado = await Convidado.findByPk(req.usuarioId, {
       attributes: [ 
         'convidadoId', 'nome', 'email', 'cpf', 'telefone', 'genero', 
         'dataNascimento', 'endereco', 'cidade', 'cep', 'avatarUrl', 'sobreMim'
@@ -1162,7 +1162,7 @@ app.put("/perfil/convidado", autenticar, async (req, res) => {
     res.json({
       success: true,
       message: "Perfil atualizado com sucesso",
-      convidado: convidado
+      convidado: convidadoAtualizado // ✅ Retornar dados completos
     });
   } catch (error) {
     console.error("Erro ao atualizar perfil:", error);
