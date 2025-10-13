@@ -17,7 +17,7 @@ const Convidado = require("./models/Convidado");
 const Mensagem = require("./models/Mensagem");
 const Grupo = require("./models/Grupo");
 const Participacao = require("./models/Participacao");
-const MembrosGrupo = require("./models/MembrosGrupo"); 
+const MembrosGrupo = require("./models/MembrosGrupo");
 
 app.use(cors());
 app.use(express.json());
@@ -521,7 +521,8 @@ app.post("/login/convidado", async (req, res) => {
   try {
     const convidado = await Convidado.findOne({
       where: { email },
-      attributes: ["convidadoId", "nome", "email", "senha", "cpf"],
+      // ✅ CORREÇÃO: Adicionar avatarUrl nos attributes
+      attributes: ["convidadoId", "nome", "email", "senha", "cpf", "avatarUrl"],
     });
 
     if (!convidado || convidado.senha !== senha) {
@@ -547,7 +548,7 @@ app.post("/login/convidado", async (req, res) => {
       success: true,
       message: "Login realizado com sucesso",
       token,
-      convidado: convidadoResponse,
+      convidado: convidadoResponse, // ✅ Agora inclui avatarUrl
     });
   } catch (error) {
     console.error("Erro no login:", error);
@@ -562,24 +563,23 @@ app.post("/login/convidado", async (req, res) => {
 app.get("/perfil/convidado", autenticar, async (req, res) => {
   try {
     const convidado = await Convidado.findByPk(req.usuarioId, {
-      // ✅ CORREÇÃO: Adicionar TODOS os campos necessários
+      // ✅ CORREÇÃO: Garantir que avatarUrl está incluído
       attributes: [
-        'convidadoId', 'nome', 'email', 'cpf', 'telefone', 'genero', 
+        'convidadoId', 'nome', 'email', 'cpf', 'telefone', 'genero',
         'dataNascimento', 'endereco', 'cidade', 'cep', 'avatarUrl', 'sobreMim'
       ],
     });
 
     if (!convidado) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Convidado não encontrado" 
+      return res.status(404).json({
+        success: false,
+        message: "Convidado não encontrado"
       });
     }
 
-    // ✅ CORREÇÃO: Retornar estrutura consistente
     res.json({
       success: true,
-      convidado: convidado, // Agora com todos os campos
+      convidado: convidado,
       estatisticas: {
         amigos: 10,
         eventos: 10,
@@ -599,9 +599,9 @@ app.get("/perfil/convidado", autenticar, async (req, res) => {
     });
   } catch (error) {
     console.error("Erro ao buscar perfil:", error);
-    res.status(500).json({ 
-      success: false, 
-      message: "Erro ao buscar perfil" 
+    res.status(500).json({
+      success: false,
+      message: "Erro ao buscar perfil"
     });
   }
 });
@@ -777,6 +777,87 @@ app.post("/mensagens/:grupoId", autenticar, async (req, res) => {
     res
       .status(500)
       .json({ success: false, message: "Erro interno do servidor" });
+  }
+});
+
+app.get("/api/eventos/busca-nome", async (req, res) => {
+  try {
+    const { query, limite = 10 } = req.query;
+
+    console.log(`[BUSCA] Recebida busca por: "${query}"`);
+
+    if (!query || query.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Parâmetro de busca é obrigatório",
+      });
+    }
+
+    // Buscar eventos - mesmo que não encontre nada, retorna array vazio
+    const eventos = await Evento.findAll({
+      where: {
+        statusEvento: "ativo",
+        nomeEvento: {
+          [Op.iLike]: `%${query}%`,
+        },
+      },
+      include: [
+        {
+          model: Localizacao,
+          as: "localizacao",
+          attributes: ["endereco", "cidade", "estado"],
+        },
+        {
+          model: Organizador,
+          as: "organizador",
+          attributes: ["nome", "avatarUrl"],
+        },
+        {
+          model: Ingresso,
+          attributes: ["preco"],
+          required: false,
+        },
+        {
+          model: Midia,
+          attributes: ["url", "tipo"],
+          required: false,
+        },
+      ],
+      order: [["dataInicio", "ASC"]],
+      limit: parseInt(limite),
+    });
+
+    console.log(`[BUSCA] Encontrados ${eventos.length} eventos para "${query}"`);
+
+    // Formatar os dados para resposta - mesmo se array estiver vazio
+    const eventosFormatados = eventos.map(evento => ({
+      eventoId: evento.eventoId,
+      nomeEvento: evento.nomeEvento,
+      descEvento: evento.descEvento,
+      dataInicio: evento.dataInicio,
+      horaInicio: evento.horaInicio,
+      categoria: evento.categoria,
+      localizacao: evento.localizacao,
+      organizador: evento.organizador,
+      Ingressos: evento.Ingressos,
+      Midia: evento.Midia,
+    }));
+
+    res.status(200).json({
+      success: true,
+      eventos: eventosFormatados,
+      total: eventosFormatados.length,
+    });
+  } catch (error) {
+    console.error("Erro detalhado na busca de eventos:", error);
+
+    // Em caso de erro, retorna array vazio em vez de erro 500
+    res.status(200).json({
+      success: true,
+      eventos: [],
+      total: 0,
+      message: "Nenhum evento encontrado"
+    });
   }
 });
 
@@ -1108,7 +1189,7 @@ app.get("/api/eventos/:id", async (req, res) => {
   }
 });
 
-// Atualizar perfil do convidado
+
 // CORREÇÃO: Buscar todos os campos exceto senha
 app.put("/perfil/convidado", autenticar, async (req, res) => {
   try {
@@ -1119,20 +1200,20 @@ app.put("/perfil/convidado", autenticar, async (req, res) => {
       });
     }
 
-    const { 
-      nome, 
-      sobreMim, 
-      telefone, 
-      dataNascimento, 
-      endereco, 
-      cidade, 
+    const {
+      nome,
+      sobreMim,
+      telefone,
+      dataNascimento,
+      endereco,
+      cidade,
       cep,
       senha,
       genero
     } = req.body;
-    
+
     const camposParaAtualizar = {};
-    
+
     // ✅ Certifique-se que todos os campos estão sendo mapeados
     if (nome !== undefined) camposParaAtualizar.nome = nome;
     if (sobreMim !== undefined) camposParaAtualizar.sobreMim = sobreMim;
@@ -1142,7 +1223,7 @@ app.put("/perfil/convidado", autenticar, async (req, res) => {
     if (endereco !== undefined) camposParaAtualizar.endereco = endereco;
     if (cidade !== undefined) camposParaAtualizar.cidade = cidade;
     if (cep !== undefined) camposParaAtualizar.cep = cep?.replace(/\D/g, "") || null;
-    
+
     if (senha && senha.trim() !== '') {
       camposParaAtualizar.senha = senha;
     }
@@ -1153,8 +1234,8 @@ app.put("/perfil/convidado", autenticar, async (req, res) => {
 
     // ✅ BUSCAR TODOS OS CAMPOS ATUALIZADOS
     const convidadoAtualizado = await Convidado.findByPk(req.usuarioId, {
-      attributes: [ 
-        'convidadoId', 'nome', 'email', 'cpf', 'telefone', 'genero', 
+      attributes: [
+        'convidadoId', 'nome', 'email', 'cpf', 'telefone', 'genero',
         'dataNascimento', 'endereco', 'cidade', 'cep', 'avatarUrl', 'sobreMim'
       ]
     });
@@ -1224,6 +1305,8 @@ app.put(
   }
 );
 
+
+
 // ROTA POST PARA PARTICIPAR (MANTIDA)
 app.post("/participar/evento/:ingressoId", autenticar, async (req, res) => {
   try {
@@ -1266,7 +1349,7 @@ app.post("/participar/evento/:ingressoId", autenticar, async (req, res) => {
       // Por simplicidade, vamos considerar uma nova compra.
       // Você pode adicionar lógica de atualização se necessário.
     }
-    
+
     // Simulação: Gera um código de transação fictício
     const codigoTransacao = `TRANS-${Date.now()}-${req.usuarioId}`;
 
@@ -1306,13 +1389,13 @@ app.get("/participacao/evento/:eventoId", autenticar, async (req, res) => {
 
     // Busca ingressos relacionados ao evento
     const ingressosEvento = await Ingresso.findAll({
-        where: { eventoId },
-        attributes: ['ingressoId']
+      where: { eventoId },
+      attributes: ['ingressoId']
     });
     const ingressoIds = ingressosEvento.map(ing => ing.ingressoId);
 
     if (ingressoIds.length === 0) {
-        return res.status(200).json({ status: "Não Participa" });
+      return res.status(200).json({ status: "Não Participa" });
     }
 
     // Busca a participação do convidado para qualquer um desses ingressos
@@ -1320,7 +1403,7 @@ app.get("/participacao/evento/:eventoId", autenticar, async (req, res) => {
       where: {
         convidadoId: req.usuarioId,
         ingressoId: {
-            [Op.in]: ingressoIds
+          [Op.in]: ingressoIds
         },
         statusPagamento: 'Confirmado'
       },
@@ -1328,7 +1411,7 @@ app.get("/participacao/evento/:eventoId", autenticar, async (req, res) => {
     });
 
     const status = participacao ? 'Participa' : 'Não Participa';
-    
+
     res.status(200).json({ status });
   } catch (error) {
     console.error("Erro ao buscar status de participação:", error);
@@ -1341,15 +1424,15 @@ const verifyConvidadoMiddleware = async (req, res, next) => {
   try {
     const token = req.headers.authorization?.replace("Bearer ", "");
     if (!token) {
-        return res.status(401).send("Acesso negado: Token ausente.");
+      return res.status(401).send("Acesso negado: Token ausente.");
     }
-    
+
     const usuario = await verificarToken(token);
-    
+
     if (!usuario || !(usuario instanceof Convidado)) {
-        return res.status(403).send("Acesso negado: Somente convidados.");
+      return res.status(403).send("Acesso negado: Somente convidados.");
     }
-    
+
     req.usuario = usuario;
     req.usuarioId = usuario.convidadoId;
     next();
@@ -1366,7 +1449,7 @@ app.post("/grupos/aderir", verifyConvidadoMiddleware, async (req, res) => {
 
   try {
     // 1. Encontrar o grupo associado ao evento
-    const grupo = await Grupo.findOne({ 
+    const grupo = await Grupo.findOne({
       where: { eventoId, tipo: 'evento' },
       attributes: ['grupoId', 'nome']
     });
@@ -1411,39 +1494,39 @@ app.post("/grupos/aderir", verifyConvidadoMiddleware, async (req, res) => {
 
 // NOVA ROTA GET: LISTAR GRUPOS DO CONVIDADO LOGADO
 app.get("/grupos/convidado", verifyConvidadoMiddleware, async (req, res) => {
-    const convidadoId = req.usuarioId;
+  const convidadoId = req.usuarioId;
 
-    try {
-        // Busca as associações de membro do convidado
-        const membros = await MembrosGrupo.findAll({
-            where: { convidadoId },
-            include: [{
-                model: Grupo,
-                as: 'grupo',
-                attributes: ['grupoId', 'nome', 'descricao', 'eventoId'],
-                // Inclui o nome do Evento associado
-                include: [{
-                    model: Evento,
-                    as: 'evento',
-                    attributes: ['nomeEvento'] 
-                }]
-            }],
-        });
-        
-        // Formata o resultado para enviar apenas os dados do grupo
-        const gruposFormatados = membros.map(membro => ({
-            grupoId: membro.grupo.grupoId,
-            nome: membro.grupo.nome,
-            descricao: membro.grupo.descricao,
-            eventoNome: membro.grupo.evento ? membro.grupo.evento.nomeEvento : 'Evento Removido'
-        }));
+  try {
+    // Busca as associações de membro do convidado
+    const membros = await MembrosGrupo.findAll({
+      where: { convidadoId },
+      include: [{
+        model: Grupo,
+        as: 'grupo',
+        attributes: ['grupoId', 'nome', 'descricao', 'eventoId'],
+        // Inclui o nome do Evento associado
+        include: [{
+          model: Evento,
+          as: 'evento',
+          attributes: ['nomeEvento']
+        }]
+      }],
+    });
 
-        res.json({ success: true, grupos: gruposFormatados });
+    // Formata o resultado para enviar apenas os dados do grupo
+    const gruposFormatados = membros.map(membro => ({
+      grupoId: membro.grupo.grupoId,
+      nome: membro.grupo.nome,
+      descricao: membro.grupo.descricao,
+      eventoNome: membro.grupo.evento ? membro.grupo.evento.nomeEvento : 'Evento Removido'
+    }));
 
-    } catch (error) {
-        console.error("Erro ao buscar grupos do convidado:", error);
-        res.status(500).json({ success: false, message: "Erro interno do servidor." });
-    }
+    res.json({ success: true, grupos: gruposFormatados });
+
+  } catch (error) {
+    console.error("Erro ao buscar grupos do convidado:", error);
+    res.status(500).json({ success: false, message: "Erro interno do servidor." });
+  }
 });
 
 
