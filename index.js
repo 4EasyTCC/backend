@@ -18,6 +18,7 @@ const Mensagem = require("./models/Mensagem");
 const Grupo = require("./models/Grupo");
 const Participacao = require("./models/Participacao");
 const MembrosGrupo = require("./models/MembrosGrupo");
+const Favorito = require("./models/Favorito");
 
 app.use(cors());
 app.use(express.json());
@@ -577,6 +578,41 @@ app.get("/perfil/convidado", autenticar, async (req, res) => {
       });
     }
 
+    // Buscar favoritos reais do convidado (se houver)
+    let eventosFavoritos = [];
+    try {
+      const favoritos = await Favorito.findAll({
+        where: { convidadoId: req.usuarioId },
+        include: [
+          {
+            model: Evento,
+            as: 'evento',
+            include: [
+              { model: Localizacao, as: 'localizacao', attributes: ['endereco', 'cidade', 'estado'] },
+              { model: Organizador, as: 'organizador', attributes: ['nome', 'avatarUrl'] },
+              { model: Midia, attributes: ['url', 'tipo'], required: false },
+            ],
+          },
+        ],
+        order: [['createdAt', 'DESC']],
+      });
+
+      eventosFavoritos = favoritos
+        .map(f => f.evento)
+        .filter(Boolean)
+        .map(e => ({
+          eventoId: e.eventoId,
+          nomeEvento: e.nomeEvento,
+          dataInicio: e.dataInicio,
+          localizacao: e.localizacao,
+          organizador: e.organizador,
+          Midia: e.Midia,
+        }));
+    } catch (err) {
+      console.warn('Não foi possível carregar favoritos do banco:', err.message || err);
+      eventosFavoritos = [];
+    }
+
     res.json({
       success: true,
       convidado: convidado,
@@ -588,14 +624,10 @@ app.get("/perfil/convidado", autenticar, async (req, res) => {
         categoriaMaisFrequente: "Festivais",
         localMaisVisitado: "Etasp",
       },
-      eventosFavoritos: Array(6).fill({
-        nome: "Evento X",
-        imagem: "/uploads/evento.png",
-      }),
-      profissoesFavoritas: Array(6).fill({
-        nome: "DJ",
-        imagem: "/uploads/profissao.png",
-      }),
+      eventosFavoritos,
+      eventosFavoritosMensagem: eventosFavoritos.length ? undefined : "Usuário não possui eventos favoritados",
+      profissoesFavoritas: [],
+      profissoesFavoritasMensagem: "Usuário não possui profissionais favoritados",
     });
   } catch (error) {
     console.error("Erro ao buscar perfil:", error);
@@ -661,6 +693,103 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     console.log("Usuário desconectado:", socket.id);
   });
+});
+
+// Associações do modelo Favorito (se necessário)
+try {
+  Favorito.belongsTo(Convidado, { foreignKey: 'convidadoId', as: 'convidado' });
+  Favorito.belongsTo(Evento, { foreignKey: 'eventoId', as: 'evento' });
+} catch (e) {
+  console.warn('Aviso ao configurar associações de Favorito:', e.message || e);
+}
+
+// ROTAS DE FAVORITOS (para convidados)
+app.get('/favoritos', autenticar, async (req, res) => {
+  try {
+    if (req.tipoUsuario !== 'convidado') {
+      return res.status(403).json({ success: false, message: 'Apenas convidados podem acessar favoritos' });
+    }
+
+    const favoritos = await Favorito.findAll({
+      where: { convidadoId: req.usuarioId },
+      include: [
+        {
+          model: Evento,
+          as: 'evento',
+          include: [
+            { model: Localizacao, as: 'localizacao', attributes: ['endereco', 'cidade', 'estado'] },
+            { model: Organizador, as: 'organizador', attributes: ['nome', 'avatarUrl'] },
+            { model: Midia, attributes: ['url', 'tipo'], required: false },
+          ],
+        },
+      ],
+      order: [['createdAt', 'DESC']],
+    });
+
+    const eventosFavoritos = favoritos
+      .map(f => f.evento)
+      .filter(Boolean)
+      .map(e => ({
+        eventoId: e.eventoId,
+        nomeEvento: e.nomeEvento,
+        dataInicio: e.dataInicio,
+        localizacao: e.localizacao,
+        organizador: e.organizador,
+        Midia: e.Midia,
+      }));
+
+    res.json({ success: true, eventosFavoritos });
+  } catch (error) {
+    console.error('Erro ao buscar favoritos:', error);
+    res.status(500).json({ success: false, message: 'Erro ao buscar favoritos' });
+  }
+});
+
+app.post('/favoritos', autenticar, async (req, res) => {
+  try {
+    if (req.tipoUsuario !== 'convidado') {
+      return res.status(403).json({ success: false, message: 'Apenas convidados podem favoritar eventos' });
+    }
+
+    const { eventoId } = req.body;
+    if (!eventoId) {
+      return res.status(400).json({ success: false, message: 'eventoId é obrigatório' });
+    }
+
+    const evento = await Evento.findByPk(eventoId);
+    if (!evento) {
+      return res.status(404).json({ success: false, message: 'Evento não encontrado' });
+    }
+
+    // Cria apenas se não existir (unique index garante integridade)
+    const [fav, created] = await Favorito.findOrCreate({
+      where: { convidadoId: req.usuarioId, eventoId },
+    });
+
+    return res.status(created ? 201 : 200).json({ success: true, favorito: fav, created });
+  } catch (error) {
+    console.error('Erro ao criar favorito:', error);
+    res.status(500).json({ success: false, message: 'Erro ao criar favorito' });
+  }
+});
+
+app.delete('/favoritos/:eventoId', autenticar, async (req, res) => {
+  try {
+    if (req.tipoUsuario !== 'convidado') {
+      return res.status(403).json({ success: false, message: 'Apenas convidados podem remover favoritos' });
+    }
+
+    const { eventoId } = req.params;
+    const deleted = await Favorito.destroy({ where: { convidadoId: req.usuarioId, eventoId } });
+    if (deleted === 0) {
+      return res.status(404).json({ success: false, message: 'Favorito não encontrado' });
+    }
+
+    res.json({ success: true, message: 'Favorito removido' });
+  } catch (error) {
+    console.error('Erro ao remover favorito:', error);
+    res.status(500).json({ success: false, message: 'Erro ao remover favorito' });
+  }
 });
 
 // REMOVIDA ROTA ANTIGA /grupos DE ORGANIZADOR
