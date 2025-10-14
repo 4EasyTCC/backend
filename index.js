@@ -794,12 +794,18 @@ app.get("/api/eventos/busca-nome", async (req, res) => {
     }
 
     // Buscar eventos - mesmo que não encontre nada, retorna array vazio
+    // SQL Server does not support ILIKE. Use LOWER + LIKE for case-insensitive search.
+    console.log(`[BUSCA] Executando busca (mssql-compatible) por: ${query}`);
     const eventos = await Evento.findAll({
       where: {
         statusEvento: "ativo",
-        nomeEvento: {
-          [Op.iLike]: `%${query}%`,
-        },
+        // Use literal to produce: LOWER([nomeEvento]) LIKE '%query%'
+        [Op.and]: sequelize.where(
+          sequelize.fn('LOWER', sequelize.col('nomeEvento')),
+          {
+            [Op.like]: `%${query.toLowerCase()}%`,
+          }
+        ),
       },
       include: [
         {
@@ -1569,6 +1575,162 @@ app.get("/grupos/organizador", autenticar, async (req, res) => {
 http.listen(PORT, () => {
   console.log(`Servidor rodando com Socket.IO na porta: ${PORT}`);
 });
+
+/*
+async function seedEvents() {
+  try {
+    // Primeiro, vamos verificar se existe um organizador
+    let organizador = await Organizador.findOne();
+
+    if (!organizador) {
+      // Criar um organizador padrão se não existir
+      organizador = await Organizador.create({
+        nome: "Organizador Exemplo",
+        email: "organizador@exemplo.com",
+        senha: "senha123",
+      });
+    }
+
+    // Criar localizações
+    const localizacoes = await Localizacao.bulkCreate([
+      {
+        endereco: "Avenida Paulista, 1000",
+        cidade: "São Paulo",
+        estado: "SP",
+        cep: "01310-100",
+        latitude: -23.563099,
+        longitude: -46.654279,
+      },
+      {
+        endereco: "Praça da Liberdade, 100",
+        cidade: "Belo Horizonte",
+        estado: "MG",
+        cep: "30140-010",
+        latitude: -19.934937,
+        longitude: -43.938424,
+      },
+      {
+        endereco: "Praia de Copacabana, 200",
+        cidade: "Rio de Janeiro",
+        estado: "RJ",
+        cep: "22070-010",
+        latitude: -22.971177,
+        longitude: -43.182543,
+      },
+    ]);
+
+    // Criar eventos
+    const eventos = await Evento.bulkCreate([
+  {
+    nomeEvento: "Festival de Música Verão 2024",
+    descEvento: "Um incrível festival com as melhores bandas nacionais e internacionais",
+    categoria: "Festas e Shows",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-02-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-02-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo", // ← GARANTIR QUE ESTÁ "ativo"
+    localizacaoId: localizacoes[2].localizacaoId,
+    organizadorId: organizador.organizadorId,
+  },
+  {
+    nomeEvento: "Workshop de Gastronomia Italiana",
+    descEvento: "Aprenda a fazer massas e molhos autênticos da Itália",
+    categoria: "Gastronomia",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-03-10",
+    horaInicio: "14:00:00",
+    dataFim: "2024-03-10",
+    horaFim: "18:00:00",
+    statusEvento: "ativo", // ← GARANTIR QUE ESTÁ "ativo"
+    localizacaoId: localizacoes[0].localizacaoId,
+    organizadorId: organizador.organizadorId,
+  },
+  {
+    nomeEvento: "Maratona de São Paulo",
+    descEvento: "Corrida de 42km pelas principais ruas da cidade",
+    categoria: "Esporte",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-04-07",
+    horaInicio: "06:00:00",
+    dataFim: "2024-04-07",
+    horaFim: "12:00:00",
+    statusEvento: "ativo", // ← GARANTIR QUE ESTÁ "ativo"
+    localizacaoId: localizacoes[0].localizacaoId,
+    organizadorId: organizador.organizadorId,
+  },
+]);
+
+    // Adicionar mídias (usando a imagem fornecida)
+    await Midia.bulkCreate([
+      {
+        eventoId: eventos[0].eventoId,
+        url: "/uploads/evento1.jpeg",
+        tipo: "capa",
+      },
+      {
+        eventoId: eventos[1].eventoId,
+        url: "/uploads/evento2.jpeg",
+        tipo: "capa",
+      },
+      {
+        eventoId: eventos[2].eventoId,
+        url: "/uploads/evento3.jpeg",
+        tipo: "capa",
+      },
+    ]);
+
+    // Adicionar ingressos
+    await Ingresso.bulkCreate([
+      {
+        eventoId: eventos[0].eventoId,
+        nome: "Pista",
+        descricao: "Acesso à área principal do festival",
+        preco: 150.0,
+        quantidade: 5000,
+        dataLimite: "2024-02-14",
+      },
+      {
+        eventoId: eventos[0].eventoId,
+        nome: "VIP",
+        descricao: "Área exclusiva com open bar e comida",
+        preco: 350.0,
+        quantidade: 1000,
+        dataLimite: "2024-02-14",
+      },
+      {
+        eventoId: eventos[1].eventoId,
+        nome: "Participante",
+        descricao: "Inclui todos os materiais e degustação",
+        preco: 200.0,
+        quantidade: 20,
+        dataLimite: "2024-03-08",
+      },
+      {
+        eventoId: eventos[2].eventoId,
+        nome: "Corredor",
+        descricao: "Inscrição para a maratona completa",
+        preco: 120.0,
+        quantidade: 1000,
+        dataLimite: "2024-04-01",
+      },
+    ]);
+
+    console.log("Eventos criados com sucesso!");
+    console.log(
+      `Foram criados ${eventos.length} eventos com a imagem fornecida.`
+    );
+  } catch (error) {
+    console.error("Erro ao criar eventos:", error);
+  } finally {
+    await sequelize.close();
+  }
+}
+
+// Executar o script
+seedEvents();
+*/
 
 sequelize
   .sync({ force: false })

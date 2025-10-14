@@ -35,5 +35,4 @@ const Participacao = sequelize.define(
   }
 );
 
-sequelize.sync();
 module.exports = Participacao;

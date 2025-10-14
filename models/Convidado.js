@@ -60,7 +60,6 @@ const Convidado = sequelize.define(
   }
 );
 
-sequelize.sync();
 module.exports = Convidado;
 const CompraIngresso = require("./CompraIngresso");
 

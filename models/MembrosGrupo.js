@@ -27,7 +27,6 @@ const MembrosGrupo = sequelize.define(
   }
 );
 
-sequelize.sync();
 module.exports = MembrosGrupo;
 
 const Grupo = require("./Grupo");
