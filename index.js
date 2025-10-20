@@ -1141,7 +1141,6 @@ app.get("/api/eventos/categorias", async (req, res) => {
     "Religião e Espiritualidade",
     "Saúde e Bem-Estar",
     "Teatros e Espetáculos",
-    //esporte, moda ,congresso e palestra, festas e show, infantil 
   ];
 
   res.status(200).json(categorias);
@@ -1708,16 +1707,41 @@ http.listen(PORT, () => {
 /*
 async function seedEvents() {
   try {
-    // Primeiro, vamos verificar se existe um organizador
-    let organizador = await Organizador.findOne();
+    let organizador1 = await Organizador.findOne();
+    let organizador2 = await Organizador.findOne();
+    let organizador3 = await Organizador.findOne();
+    let organizador4 = await Organizador.findOne();
+    let organizador5 = await Organizador.findOne();
 
-    if (!organizador) {
-      // Criar um organizador padrão se não existir
-      organizador = await Organizador.create({
-        nome: "Organizador Exemplo",
-        email: "organizador@exemplo.com",
-        senha: "senha123",
+    if (!organizador1) {
+      organizador1 = await Organizador.create({
+        nome: "Jorge",
+        email: "jorge@gmail.com",
+        senha: "1234",
       });
+      organizador2 = await Organizador.create({
+        nome: "Yas",
+        email: "yas@gmail.com",
+        senha: "1234",
+      });
+
+      organizador3 = await Organizador.create({
+        nome: "Rafael",
+        email: "rafael@gmail.com",
+        senha: "1234",
+      });
+
+      organizador4 = await Organizador.create({
+        nome: "Leandro",
+        email: "leandro@gamail.com",
+        senha: "1234",
+      });
+      organizador5 = await Organizador.create({
+        nome: "Cayo",
+        email: "cayo@gamil.com",
+        senha: "1234",
+      });
+
     }
 
     // Criar localizações
@@ -1751,43 +1775,246 @@ async function seedEvents() {
     // Criar eventos
     const eventos = await Evento.bulkCreate([
   {
-    nomeEvento: "Festival de Música Verão 2024",
-    descEvento: "Um incrível festival com as melhores bandas nacionais e internacionais",
-    categoria: "Festas e Shows",
+    nomeEvento: "Evento de Futebol",
+    descEvento: "Um incrível festival com os melhores clubes nacionais e internacionais",
+    categoria: "Esporte",
     privacidadeEvento: "Público",
-    dataInicio: "2024-02-15",
+    dataInicio: "2024-12-15",
     horaInicio: "16:00:00",
-    dataFim: "2024-02-16",
+    dataFim: "2024-12-16",
     horaFim: "02:00:00",
     statusEvento: "ativo", // ← GARANTIR QUE ESTÁ "ativo"
     localizacaoId: localizacoes[2].localizacaoId,
-    organizadorId: organizador.organizadorId,
+    organizadorId: organizador1.organizadorId,
   },
   {
-    nomeEvento: "Workshop de Gastronomia Italiana",
-    descEvento: "Aprenda a fazer massas e molhos autênticos da Itália",
-    categoria: "Gastronomia",
-    privacidadeEvento: "Público",
-    dataInicio: "2024-03-10",
-    horaInicio: "14:00:00",
-    dataFim: "2024-03-10",
-    horaFim: "18:00:00",
-    statusEvento: "ativo", // ← GARANTIR QUE ESTÁ "ativo"
-    localizacaoId: localizacoes[0].localizacaoId,
-    organizadorId: organizador.organizadorId,
-  },
-  {
-    nomeEvento: "Maratona de São Paulo",
-    descEvento: "Corrida de 42km pelas principais ruas da cidade",
+    nomeEvento: "Evento Surf",
+    descEvento: "Um incrível festival de surf melhores atletas nacionais e internacionais",
     categoria: "Esporte",
     privacidadeEvento: "Público",
-    dataInicio: "2024-04-07",
-    horaInicio: "06:00:00",
-    dataFim: "2024-04-07",
-    horaFim: "12:00:00",
+    dataInicio: "2024-11-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-11-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo", // ← GARANTIR QUE ESTÁ "ativo"
+    localizacaoId: localizacoes[2].localizacaoId,
+    organizadorId: organizador1.organizadorId,
+  },
+  {
+    nomeEvento: "Evento de Corrida",
+    descEvento: "Um incrível festival com os melhores corredores nacionais e internacionais",
+    categoria: "Esporte",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-12-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-12-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo", // ← GARANTIR QUE ESTÁ "ativo"
+    localizacaoId: localizacoes[2].localizacaoId,
+    organizadorId: organizador1.organizadorId,
+  },  
+  {
+    nomeEvento: "Evento de Vôlei ",
+    descEvento: "Um incrível jog de Vôlei com os melhores clubes nacionais e internacionais",
+    categoria: "Esporte",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-12-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-12-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo", // ← GARANTIR QUE ESTÁ "ativo"
+    localizacaoId: localizacoes[2].localizacaoId,
+    organizadorId: organizador1.organizadorId,
+  },
+
+  {
+    nomeEvento: "Evento de Basquete",
+    descEvento: "Um incrível jogo de basquete com os melhores clubes nacionais e internacionais",
+    categoria: "Esporte",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-12-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-12-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo", // ← GARANTIR QUE ESTÁ "ativo"
+    localizacaoId: localizacoes[2].localizacaoId,
+    organizadorId: organizador1.organizadorId,
+  },
+
+  {
+    nomeEvento: "Show Linkin Park",
+    descEvento: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+    categoria: "Festas e Shows",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-12-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-12-16",
+    horaFim: "02:00:00",
     statusEvento: "ativo", // ← GARANTIR QUE ESTÁ "ativo"
     localizacaoId: localizacoes[0].localizacaoId,
-    organizadorId: organizador.organizadorId,
+    organizadorId: organizador2.organizadorId,
+  },
+  {
+    nomeEvento: "Show Luan Santana",
+    descEvento: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+    categoria: "Festas e Shows",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-11-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-11-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo", // ← GARANTIR QUE ESTÁ "ativo"
+    localizacaoId: localizacoes[0].localizacaoId,
+    organizadorId: organizador2.organizadorId,
+  },
+  {
+    nomeEvento: "Festival Michael Jackson",
+    descEvento: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+    categoria: "Festas e Shows",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-12-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-12-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo", // ← GARANTIR QUE ESTÁ "ativo"
+    localizacaoId: localizacoes[0].localizacaoId,
+    organizadorId: organizador2.organizadorId,
+  },  
+  {
+    nomeEvento: "Show Xuxa ",
+    descEvento: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+    categoria: "Festas e Shows",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-12-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-12-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo", // ← GARANTIR QUE ESTÁ "ativo"
+    localizacaoId: localizacoes[0].localizacaoId,
+    organizadorId: organizador2.organizadorId,
+  },
+
+  {
+    nomeEvento: "Show Ozzy Osbourne",
+    descEvento: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+    categoria: "Festas e Shows",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-12-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-12-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo", // ← GARANTIR QUE ESTÁ "ativo"
+    localizacaoId: localizacoes[0].localizacaoId,
+    organizadorId: organizador2.organizadorId,
+  },
+
+  {
+    nomeEvento: "Master Chefe",
+    descEvento: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+    categoria: "Gastronomia",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-12-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-12-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo", // ← GARANTIR QUE ESTÁ "ativo"
+    localizacaoId: localizacoes[1].localizacaoId,
+    organizadorId: organizador3.organizadorId,
+  },
+  {
+    nomeEvento: "Festival Comida Coreana",
+    descEvento: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+    categoria: "Gastronomia",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-12-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-12-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo", // ← GARANTIR QUE ESTÁ "ativo"
+    localizacaoId: localizacoes[1].localizacaoId,
+    organizadorId: organizador3.organizadorId,
+  },  
+  {
+    nomeEvento: "Festa Junina",
+    descEvento: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+    categoria: "Gastronomia",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-12-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-12-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo", // ← GARANTIR QUE ESTÁ "ativo"
+    localizacaoId: localizacoes[1].localizacaoId,
+    organizadorId: organizador3.organizadorId,
+  },
+
+  {
+    nomeEvento: "Desfile de Moda",
+    descEvento: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+    categoria: "Moda e Beleza",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-12-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-12-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo",
+    localizacaoId: localizacoes[1].localizacaoId,
+    organizadorId: organizador4.organizadorId,
+  },
+  
+  {
+    nomeEvento: "Ensaio Fotografico Gratuito",
+    descEvento: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+    categoria: "Moda e Beleza",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-12-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-12-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo", 
+    localizacaoId: localizacoes[1].localizacaoId,
+    organizadorId: organizador4.organizadorId,
+  },
+
+
+  {
+    nomeEvento: "Evento na Disney",
+    descEvento: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+    categoria: "Infantil",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-12-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-12-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo", 
+    localizacaoId: localizacoes[1].localizacaoId,
+    organizadorId: organizador5.organizadorId,
+  },
+  {
+    nomeEvento: "Encontro com o Patati e o Patata",
+    descEvento: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+    categoria: "Infantil",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-12-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-12-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo", 
+    localizacaoId: localizacoes[1].localizacaoId,
+    organizadorId: organizador5.organizadorId,
+  },  
+  {
+    nomeEvento: "Festa de Aniversário do Sonic",
+    descEvento: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+    categoria: "Infantil",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-12-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-12-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo", 
+    localizacaoId: localizacoes[1].localizacaoId,
+    organizadorId: organizador5.organizadorId,
   },
 ]);
 
@@ -1795,17 +2022,96 @@ async function seedEvents() {
     await Midia.bulkCreate([
       {
         eventoId: eventos[0].eventoId,
-        url: "/uploads/evento1.jpeg",
+        url: "/uploads/org1/esporte1.jpg",
         tipo: "capa",
       },
       {
         eventoId: eventos[1].eventoId,
-        url: "/uploads/evento2.jpeg",
+        url: "/uploads/org1/esporte2.jpg",
         tipo: "capa",
       },
       {
         eventoId: eventos[2].eventoId,
-        url: "/uploads/evento3.jpeg",
+        url: "/uploads/org1/esporte3.jpg",
+        tipo: "capa",
+      },
+      {
+        eventoId: eventos[3].eventoId,
+        url: "/uploads/org1/esporte4.webp",
+        tipo: "capa",
+      },
+      {
+        eventoId: eventos[4].eventoId,
+        url: "/uploads/org1/galeriabasquete1.jpg",
+        tipo: "capa",
+      },
+
+
+        
+      {
+        eventoId: eventos[5].eventoId,
+        url: "/uploads/org2/show1.jpg",
+        tipo: "capa",
+      },
+      {
+        eventoId: eventos[6].eventoId,
+        url: "/uploads/org2/show2.jpg",
+        tipo: "capa",
+      },
+      {
+        eventoId: eventos[7].eventoId,
+        url: "/uploads/org2/show3.jpg",
+        tipo: "capa",
+      },
+      {
+        eventoId: eventos[8].eventoId,
+        url: "/uploads/org2/show4.jpg",
+        tipo: "capa",
+      },
+      {
+        eventoId: eventos[9].eventoId,
+        url: "/uploads/org2/show5.jpg",
+        tipo: "capa",
+      },
+
+      {
+        eventoId: eventos[10].eventoId,
+        url: "/uploads/org3/gastronomia1.jpg",
+        tipo: "capa",
+      },
+      {
+        eventoId: eventos[11].eventoId,
+        url: "/uploads/org3/gastronomia2.jpg",
+        tipo: "capa",
+      },
+      {
+        eventoId: eventos[12].eventoId,
+        url: "/uploads/org3/gastronomia3.jpg",
+        tipo: "capa",
+      },
+      {
+        eventoId: eventos[13].eventoId,
+        url: "/uploads/org4/desfile1.jpg",
+        tipo: "capa",
+      },
+      {
+        eventoId: eventos[14].eventoId,
+        url: "/uploads/org4/foto1.jpg",
+        tipo: "capa",
+      },
+      {
+        eventoId: eventos[15].eventoId,
+        url: "/uploads/org5/ney1.jpg",
+        tipo: "capa",
+      },
+      {
+        eventoId: eventos[16].eventoId,
+        url: "/uploads/org5/pat1.jpg",
+        tipo: "capa",
+      },
+      {
+        eventoId: eventos[17].eventoId,
+        url: "/uploads/org5/sonic1.jpg",
         tipo: "capa",
       },
     ]);
@@ -1815,7 +2121,7 @@ async function seedEvents() {
       {
         eventoId: eventos[0].eventoId,
         nome: "Pista",
-        descricao: "Acesso à área principal do festival",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
         preco: 150.0,
         quantidade: 5000,
         dataLimite: "2024-02-14",
@@ -1823,7 +2129,7 @@ async function seedEvents() {
       {
         eventoId: eventos[0].eventoId,
         nome: "VIP",
-        descricao: "Área exclusiva com open bar e comida",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
         preco: 350.0,
         quantidade: 1000,
         dataLimite: "2024-02-14",
@@ -1831,18 +2137,130 @@ async function seedEvents() {
       {
         eventoId: eventos[1].eventoId,
         nome: "Participante",
-        descricao: "Inclui todos os materiais e degustação",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
         preco: 200.0,
         quantidade: 20,
         dataLimite: "2024-03-08",
       },
       {
-        eventoId: eventos[2].eventoId,
-        nome: "Corredor",
-        descricao: "Inscrição para a maratona completa",
-        preco: 120.0,
+        eventoId: eventos[1].eventoId,
+        nome: "Pista",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 150.0,
+        quantidade: 5000,
+        dataLimite: "2024-02-14",
+      },
+      {
+        eventoId: eventos[1].eventoId,
+        nome: "VIP",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 350.0,
         quantidade: 1000,
-        dataLimite: "2024-04-01",
+        dataLimite: "2024-02-14",
+      },
+      {
+        eventoId: eventos[1].eventoId,
+        nome: "Pista",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 150.0,
+        quantidade: 5000,
+        dataLimite: "2024-02-14",
+      },
+      {
+        eventoId: eventos[2].eventoId,
+        nome: "VIP",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 350.0,
+        quantidade: 1000,
+        dataLimite: "2024-02-14",
+      },
+      {
+        eventoId: eventos[3].eventoId,
+        nome: "Participante",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 200.0,
+        quantidade: 20,
+        dataLimite: "2024-03-08",
+      },
+       {
+        eventoId: eventos[4].eventoId,
+        nome: "Participante",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 200.0,
+        quantidade: 20,
+        dataLimite: "2024-03-08",
+      },
+      {
+        eventoId: eventos[6].eventoId,
+        nome: "Pista",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 150.0,
+        quantidade: 5000,
+        dataLimite: "2024-02-14",
+      },
+      {
+        eventoId: eventos[7].eventoId,
+        nome: "VIP",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 350.0,
+        quantidade: 1000,
+        dataLimite: "2024-02-14",
+      },
+      {
+        eventoId: eventos[8].eventoId,
+        nome: "Participante",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 200.0,
+        quantidade: 20,
+        dataLimite: "2024-03-08",
+      },
+       {
+        eventoId: eventos[9].eventoId,
+        nome: "Participante",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 200.0,
+        quantidade: 20,
+        dataLimite: "2024-03-08",
+      },
+      {
+        eventoId: eventos[10].eventoId,
+        nome: "VIP",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 350.0,
+        quantidade: 1000,
+        dataLimite: "2024-02-14",
+      },
+      {
+        eventoId: eventos[11].eventoId,
+        nome: "Participante",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 200.0,
+        quantidade: 20,
+        dataLimite: "2024-03-08",
+      },
+       {
+        eventoId: eventos[12].eventoId,
+        nome: "Participante",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 200.0,
+        quantidade: 20,
+        dataLimite: "2024-03-08",
+      },
+      {
+        eventoId: eventos[13].eventoId,
+        nome: "Participante",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 200.0,
+        quantidade: 20,
+        dataLimite: "2024-03-08",
+      },       
+      {
+        eventoId: eventos[13].eventoId,
+        nome: "Participante",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 200.0,
+        quantidade: 20,
+        dataLimite: "2024-03-08",
       },
     ]);
 
