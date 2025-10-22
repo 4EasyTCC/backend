@@ -19,6 +19,7 @@ const Grupo = require("./models/Grupo");
 const Participacao = require("./models/Participacao");
 const MembrosGrupo = require("./models/MembrosGrupo");
 const Favorito = require("./models/Favorito");
+const CompraIngresso = require("./models/CompraIngresso");
 
 app.use(cors());
 app.use(express.json());
@@ -613,6 +614,49 @@ app.get("/perfil/convidado", autenticar, async (req, res) => {
       eventosFavoritos = [];
     }
 
+    // Buscar histórico de compras do convidado
+    let comprasHistorico = [];
+    try {
+      const compras = await CompraIngresso.findAll({
+        where: { convidadoId: req.usuarioId },
+        include: [
+          {
+            model: Ingresso,
+            as: 'ingressoComprado',
+            attributes: ['ingressoId', 'nome', 'preco', 'eventoId'],
+            include: [
+              { model: Evento, attributes: ['eventoId', 'nomeEvento'] }
+            ]
+          }
+        ],
+        order: [['createdAt', 'DESC']],
+      });
+
+      comprasHistorico = compras.map(c => {
+        const ing = c.ingressoComprado || null;
+        const evt = ing ? (ing.Evento || null) : null; // Evento sem alias costuma aparecer como 'Evento'
+
+        return {
+          compraId: c.compraId,
+          ingressoId: c.ingressoId,
+          quantidade: c.quantidade,
+          valorTotal: c.valorTotal,
+          statusPagamento: c.statusPagamento,
+          compradoEm: c.createdAt,
+          ingresso: ing ? {
+            ingressoId: ing.ingressoId,
+            nome: ing.nome,
+            preco: ing.preco,
+            eventoId: ing.eventoId,
+            eventoNome: evt ? evt.nomeEvento : undefined
+          } : null
+        };
+      });
+    } catch (err) {
+      console.warn('Erro ao buscar histórico de compras:', err.message || err);
+      comprasHistorico = [];
+    }
+
     res.json({
       success: true,
       convidado: convidado,
@@ -628,6 +672,7 @@ app.get("/perfil/convidado", autenticar, async (req, res) => {
       eventosFavoritosMensagem: eventosFavoritos.length ? undefined : "Usuário não possui eventos favoritados",
       profissoesFavoritas: [],
       profissoesFavoritasMensagem: "Usuário não possui profissionais favoritados",
+      comprasHistorico,
     });
   } catch (error) {
     console.error("Erro ao buscar perfil:", error);
@@ -1469,11 +1514,35 @@ app.post("/participar/evento/:ingressoId", autenticar, async (req, res) => {
     if (participacaoExistente) {
       // Se a participação já existe e está Confirmada, retorna sucesso.
       if (participacaoExistente.statusPagamento === 'Confirmado') {
-        return res.status(200).json({
-          success: true,
-          message: "Participação já confirmada.",
-          participacao: participacaoExistente,
-        });
+        // Mesmo que a participação já esteja confirmada, registrar uma CompraIngresso
+        // para contabilizar compras repetidas e aparecer no histórico do usuário.
+        try {
+          const quantidadeComprada = parseInt(req.body.quantidade || 1, 10) || 1;
+          const valorTotal = (ingresso.preco || 0) * quantidadeComprada;
+
+          const compra = await CompraIngresso.create({
+            convidadoId: req.usuarioId,
+            ingressoId: ingressoId,
+            quantidade: quantidadeComprada,
+            valorTotal,
+            statusPagamento: 'confirmado'
+          });
+
+          return res.status(200).json({
+            success: true,
+            message: "Participação já confirmada. Compra registrada.",
+            participacao: participacaoExistente,
+            compra
+          });
+        } catch (err) {
+          console.warn('Falha ao registrar compra adicional:', err.message || err);
+          // Não bloquear a resposta principal se falhar ao gravar compra; ainda retornamos success
+          return res.status(200).json({
+            success: true,
+            message: "Participação já confirmada.",
+            participacao: participacaoExistente,
+          });
+        }
       }
       // Se estiver Pendente/Cancelada, a lógica de negócio deve decidir se atualiza.
       // Por simplicidade, vamos considerar uma nova compra.
@@ -1490,6 +1559,25 @@ app.post("/participar/evento/:ingressoId", autenticar, async (req, res) => {
       statusPagamento: 'Confirmado', // SIMULAÇÃO: Pagamento bem-sucedido
       codigoTransacao: codigoTransacao,
     });
+
+    // Criar também registro em CompraIngresso para histórico detalhado
+    try {
+      const quantidadeComprada = parseInt(req.body.quantidade || 1, 10) || 1;
+      const valorTotal = (ingresso.preco || 0) * quantidadeComprada;
+
+      const compra = await CompraIngresso.create({
+        convidadoId: req.usuarioId,
+        ingressoId: ingressoId,
+        quantidade: quantidadeComprada,
+        valorTotal,
+        statusPagamento: 'confirmado'
+      });
+
+      // Anexar compra à resposta
+      novaParticipacao.dataValues.compra = compra;
+    } catch (err) {
+      console.warn('Falha ao criar registro CompraIngresso:', err.message || err);
+    }
 
     res.status(201).json({
       success: true,
@@ -1700,7 +1788,7 @@ http.listen(PORT, () => {
   console.log(`Servidor rodando com Socket.IO na porta: ${PORT}`);
 });
 
-/*
+
 async function seedEvents() {
   try {
     let organizador1 = await Organizador.findOne();
@@ -1740,9 +1828,27 @@ async function seedEvents() {
 
     }
 
-    // Criar localizações
-    const localizacoes = await Localizacao.bulkCreate([
-      {
+    let convidado1 = await Convidado.findOne();
+
+  if (!convidado1) {
+  convidado1 = await Convidado.create({
+    nome: "Rafael",
+    cpf: "123.456.789-00",
+    email: "teste@gmail.com",
+    senha: "123456",
+    telefone: "(11) 91234-5678",
+    genero: "Masculino",
+    dataNascimento: "2000-01-01",
+    endereco: "Rua das Flores, 123",
+    cidade: "Guarulhos",
+    cep: "07000-000",
+    sobreMim: "Apenas um convidado de teste.",
+  });
+  }
+
+   // Criar localizações
+   const localizacoes = await Localizacao.bulkCreate([
+     {
         endereco: "Avenida Paulista, 1000",
         cidade: "São Paulo",
         estado: "SP",
@@ -2267,18 +2373,24 @@ async function seedEvents() {
   } catch (error) {
     console.error("Erro ao criar eventos:", error);
   } finally {
-    await sequelize.close();
+    // Não fechar a conexão aqui: o processo do servidor continua em execução
+    // await sequelize.close();
   }
 }
 
 // Executar o script
-seedEvents();
-*/
-
+// Sincronizar modelos primeiro e então executar o seed para garantir que as tabelas existam.
+// ATENÇÃO: `force: true` irá dropar tabelas existentes — usar somente em dev/test.
 sequelize
-  .sync({ force: false })
-  .then(() => {
+  .sync({ force: true })
+  .then(async () => {
     console.log("Modelos sincronizados com o banco de dados");
+    try {
+      await seedEvents();
+      console.log("Seed concluído");
+    } catch (err) {
+      console.error("Erro durante seedEvents:", err);
+    }
   })
   .catch((err) => {
     console.error("Erro ao sincronizar modelos:", err);
