@@ -10,12 +10,12 @@ const CompraIngresso = sequelize.define(
       autoIncrement: true,
       allowNull: false,
     },
-    // FK para a tabela de Convidado (quem comprou)
+    
     convidadoId: {
       type: DataTypes.INTEGER,
       allowNull: false,
     },
-    // FK para a tabela de Ingresso (qual ingresso foi comprado)
+    
     ingressoId: {
       type: DataTypes.INTEGER,
       allowNull: false,

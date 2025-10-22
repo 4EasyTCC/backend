@@ -744,6 +744,7 @@ io.on("connection", (socket) => {
 try {
   Favorito.belongsTo(Convidado, { foreignKey: 'convidadoId', as: 'convidado' });
   Favorito.belongsTo(Evento, { foreignKey: 'eventoId', as: 'evento' });
+  Favorito.belongsTo(Organizador, { foreignKey: 'organizadorId', as: 'organizador' });
 } catch (e) {
   console.warn('Aviso ao configurar associações de Favorito:', e.message || e);
 }
@@ -834,6 +835,70 @@ app.delete('/favoritos/:eventoId', autenticar, async (req, res) => {
   } catch (error) {
     console.error('Erro ao remover favorito:', error);
     res.status(500).json({ success: false, message: 'Erro ao remover favorito' });
+  }
+});
+
+// ROTAS DE FAVORITOS DE ORGANIZADORES
+app.get('/favoritos/organizadores', autenticar, async (req, res) => {
+  try {
+    if (req.tipoUsuario !== 'convidado') {
+      return res.status(403).json({ success: false, message: 'Apenas convidados podem acessar favoritos' });
+    }
+
+    const favoritos = await Favorito.findAll({
+      where: { convidadoId: req.usuarioId, organizadorId: { [Op.ne]: null } },
+      include: [
+        {
+          model: Organizador,
+          as: 'organizador',
+          attributes: ['organizadorId', 'nome', 'avatarUrl']
+        }
+      ],
+      order: [['createdAt', 'DESC']]
+    });
+
+    const organizadoresFavoritos = favoritos.map(f => f.organizador).filter(Boolean).map(o => ({ organizadorId: o.organizadorId, nome: o.nome, avatarUrl: o.avatarUrl }));
+
+    res.json({ success: true, organizadoresFavoritos });
+  } catch (error) {
+    console.error('Erro ao buscar favoritos de organizadores:', error);
+    res.status(500).json({ success: false, message: 'Erro ao buscar favoritos de organizadores' });
+  }
+});
+
+app.post('/favoritos/organizadores', autenticar, async (req, res) => {
+  try {
+    if (req.tipoUsuario !== 'convidado') {
+      return res.status(403).json({ success: false, message: 'Apenas convidados podem favoritar organizadores' });
+    }
+
+    const { organizadorId } = req.body;
+    if (!organizadorId) return res.status(400).json({ success: false, message: 'organizadorId é obrigatório' });
+
+    const organizador = await Organizador.findByPk(organizadorId);
+    if (!organizador) return res.status(404).json({ success: false, message: 'Organizador não encontrado' });
+
+    const [fav, created] = await Favorito.findOrCreate({ where: { convidadoId: req.usuarioId, organizadorId } });
+    return res.status(created ? 201 : 200).json({ success: true, favorito: fav, created });
+  } catch (error) {
+    console.error('Erro ao criar favorito de organizador:', error);
+    res.status(500).json({ success: false, message: 'Erro ao criar favorito de organizador' });
+  }
+});
+
+app.delete('/favoritos/organizadores/:organizadorId', autenticar, async (req, res) => {
+  try {
+    if (req.tipoUsuario !== 'convidado') {
+      return res.status(403).json({ success: false, message: 'Apenas convidados podem remover favoritos' });
+    }
+
+    const { organizadorId } = req.params;
+    const deleted = await Favorito.destroy({ where: { convidadoId: req.usuarioId, organizadorId } });
+    if (deleted === 0) return res.status(404).json({ success: false, message: 'Favorito não encontrado' });
+    res.json({ success: true, message: 'Favorito de organizador removido' });
+  } catch (error) {
+    console.error('Erro ao remover favorito de organizador:', error);
+    res.status(500).json({ success: false, message: 'Erro ao remover favorito de organizador' });
   }
 });
 
@@ -1367,6 +1432,34 @@ app.get("/api/eventos/:id", async (req, res) => {
     });
   }
 });
+
+  // Rota pública para buscar organizador e seus eventos
+  app.get('/organizadores/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const organizador = await Organizador.findByPk(id, {
+        attributes: ['organizadorId', 'nome', 'email', 'avatarUrl'],
+      });
+
+      if (!organizador) {
+        return res.status(404).json({ success: false, message: 'Organizador não encontrado' });
+      }
+
+      const eventos = await Evento.findAll({
+        where: { organizadorId: id, statusEvento: 'ativo' },
+        include: [
+          { model: Localizacao, as: 'localizacao' },
+          { model: Midia },
+        ],
+        order: [['dataInicio', 'ASC']],
+      });
+
+      res.json({ success: true, organizador: organizador.get({ plain: true }), eventos });
+    } catch (error) {
+      console.error('Erro ao buscar organizador:', error);
+      res.status(500).json({ success: false, message: 'Erro ao buscar organizador' });
+    }
+  });
 
 
 // CORREÇÃO: Buscar todos os campos exceto senha

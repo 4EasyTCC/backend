@@ -22,7 +22,7 @@ const Mensagem = sequelize.define(
       allowNull: false,
     },
     tipoUsuario: {
-      type: DataTypes.STRING, // 'organizador' ou 'convidado'
+      type: DataTypes.STRING, 
       allowNull: false,
     },
     grupoId: {

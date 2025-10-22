@@ -13,7 +13,11 @@ const Favorito = sequelize.define('Favorito', {
   },
   eventoId: {
     type: DataTypes.INTEGER,
-    allowNull: false,
+    allowNull: true,
+  },
+  organizadorId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
   },
 }, {
   tableName: 'Favoritos',
@@ -21,6 +25,10 @@ const Favorito = sequelize.define('Favorito', {
     {
       unique: true,
       fields: ['convidadoId', 'eventoId'],
+    },
+    {
+      unique: true,
+      fields: ['convidadoId', 'organizadorId'],
     },
   ],
 });

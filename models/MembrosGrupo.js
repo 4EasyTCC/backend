@@ -17,7 +17,7 @@ const MembrosGrupo = sequelize.define(
     },
     convidadoId: {
       type: DataTypes.INTEGER,
-      allowNull: true, // Permitir nulo caso decida adicionar Organizadores
+      allowNull: true, 
       references: { model: "Convidado", key: "convidadoId" },
     },
   },
