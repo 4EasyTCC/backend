@@ -1239,7 +1239,6 @@ app.get("/api/eventos/categorias", async (req, res) => {
   const categorias = [
     "Arte, Cultura e Lazer",
     "Congressos e Palestras",
-    "Cursos e Workshops",
     "Esporte",
     "Festas e Shows",
     "Gastronomia",
@@ -1247,9 +1246,6 @@ app.get("/api/eventos/categorias", async (req, res) => {
     "Grátis",
     "Infantil",
     "Moda e Beleza",
-    "Passeios e Tours",
-    "Religião e Espiritualidade",
-    "Saúde e Bem-Estar",
     "Teatros e Espetáculos",
   ];
 
@@ -2259,7 +2255,7 @@ async function seedEvents() {
       },
       {
         eventoId: eventos[7].eventoId,
-        url: "/uploads/org2/show3.jpg",
+        url: "/uploads/org2/jack3.jpg",
         tipo: "capa",
       },
       {
