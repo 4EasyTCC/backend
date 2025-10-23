@@ -6,9 +6,8 @@ const DB_USER = process.env.DB_USER;
 const DB_PASS = process.env.DB_PASS;
 let DB_HOST = process.env.DB_HOST;
 const DB_PORT = process.env.DB_PORT;
-const DB_INSTANCE = process.env.DB_INSTANCE; // optional named instance
+const DB_INSTANCE = process.env.DB_INSTANCE; 
 
-// Provide helpful error if required env vars are missing
 if (!DB_NAME || !DB_USER || !DB_PASS) {
   console.error('\nMissing required database environment variables.\nPlease create a .env file in backend/ with the following values:');
   console.error('DB_NAME=YourDatabaseName');
@@ -17,10 +16,8 @@ if (!DB_NAME || !DB_USER || !DB_PASS) {
   console.error('DB_HOST=localhost');
   console.error('DB_PORT=1433');
   console.error('DB_INSTANCE=SQLEXPRESS (optional)\n');
-  // Do not throw here; allow process to continue so the message is visible.
 }
 
-// Support host with instance like 'localhost\\SQLEXPRESS'
 let instanceName = DB_INSTANCE || null;
 if (DB_HOST && DB_HOST.includes('\\')) {
   const parts = DB_HOST.split('\\');
@@ -28,7 +25,6 @@ if (DB_HOST && DB_HOST.includes('\\')) {
   if (!instanceName && parts[1]) instanceName = parts[1];
 }
 
-// Default port
 const portNumber = DB_PORT ? parseInt(DB_PORT, 10) : 1433;
 
 const dialectOptions = {
@@ -38,7 +34,6 @@ const dialectOptions = {
   },
 };
 
-// If a named instance is provided, pass it to tedious options
 if (instanceName) {
   dialectOptions.options.instanceName = instanceName;
 }

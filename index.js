@@ -1,4 +1,3 @@
-// index.js (Backend)
 require("dotenv").config();
 const express = require("express");
 const app = express();
@@ -1482,7 +1481,6 @@ app.put("/perfil/convidado", autenticar, async (req, res) => {
 
     const camposParaAtualizar = {};
 
-    // ✅ Certifique-se que todos os campos estão sendo mapeados
     if (nome !== undefined) camposParaAtualizar.nome = nome;
     if (sobreMim !== undefined) camposParaAtualizar.sobreMim = sobreMim;
     if (genero !== undefined) camposParaAtualizar.genero = genero;
@@ -1499,8 +1497,6 @@ app.put("/perfil/convidado", autenticar, async (req, res) => {
     await Convidado.update(camposParaAtualizar, {
       where: { convidadoId: req.usuarioId }
     });
-
-    // ✅ BUSCAR TODOS OS CAMPOS ATUALIZADOS
     const convidadoAtualizado = await Convidado.findByPk(req.usuarioId, {
       attributes: [
         'convidadoId', 'nome', 'email', 'cpf', 'telefone', 'genero',
@@ -1511,7 +1507,7 @@ app.put("/perfil/convidado", autenticar, async (req, res) => {
     res.json({
       success: true,
       message: "Perfil atualizado com sucesso",
-      convidado: convidadoAtualizado // ✅ Retornar dados completos
+      convidado: convidadoAtualizado 
     });
   } catch (error) {
     console.error("Erro ao atualizar perfil:", error);
@@ -1523,7 +1519,6 @@ app.put("/perfil/convidado", autenticar, async (req, res) => {
   }
 });
 
-// Upload de foto para convidado
 app.put(
   "/perfil/convidado/foto",
   autenticar,
@@ -1551,7 +1546,6 @@ app.put(
         { where: { convidadoId: req.usuarioId } }
       );
 
-      // ✅ CORREÇÃO: Buscar convidado atualizado para retornar dados completos
       const convidado = await Convidado.findByPk(req.usuarioId, {
         attributes: ["convidadoId", "nome", "email", "avatarUrl", "sobreMim"]
       });
@@ -1560,7 +1554,7 @@ app.put(
         success: true,
         message: "Foto atualizada com sucesso",
         avatarUrl,
-        convidado: convidado // ✅ RETORNAR USUÁRIO COMPLETO
+        convidado: convidado 
       });
     } catch (error) {
       console.error("Erro ao atualizar foto:", error);
@@ -1575,12 +1569,10 @@ app.put(
 
 
 
-// ROTA POST PARA PARTICIPAR (MANTIDA)
 app.post("/participar/evento/:ingressoId", autenticar, async (req, res) => {
   try {
     const { ingressoId } = req.params;
 
-    // 1. Verificar se o usuário é um Convidado
     if (req.tipoUsuario !== "convidado") {
       return res.status(403).json({
         success: false,
@@ -1588,7 +1580,6 @@ app.post("/participar/evento/:ingressoId", autenticar, async (req, res) => {
       });
     }
 
-    // 2. Verificar se o ingresso existe
     const ingresso = await Ingresso.findByPk(ingressoId);
     if (!ingresso) {
       return res
@@ -1596,7 +1587,6 @@ app.post("/participar/evento/:ingressoId", autenticar, async (req, res) => {
         .json({ success: false, message: "Ingresso não encontrado." });
     }
 
-    // 3. Verificar se o convidado já possui uma participação para este ingresso
     const participacaoExistente = await Participacao.findOne({
       where: {
         convidadoId: req.usuarioId,
@@ -1605,10 +1595,7 @@ app.post("/participar/evento/:ingressoId", autenticar, async (req, res) => {
     });
 
     if (participacaoExistente) {
-      // Se a participação já existe e está Confirmada, retorna sucesso.
       if (participacaoExistente.statusPagamento === 'Confirmado') {
-        // Mesmo que a participação já esteja confirmada, registrar uma CompraIngresso
-        // para contabilizar compras repetidas e aparecer no histórico do usuário.
         try {
           const quantidadeComprada = parseInt(req.body.quantidade || 1, 10) || 1;
           const valorTotal = (ingresso.preco || 0) * quantidadeComprada;
@@ -1629,7 +1616,6 @@ app.post("/participar/evento/:ingressoId", autenticar, async (req, res) => {
           });
         } catch (err) {
           console.warn('Falha ao registrar compra adicional:', err.message || err);
-          // Não bloquear a resposta principal se falhar ao gravar compra; ainda retornamos success
           return res.status(200).json({
             success: true,
             message: "Participação já confirmada.",
@@ -1637,23 +1623,17 @@ app.post("/participar/evento/:ingressoId", autenticar, async (req, res) => {
           });
         }
       }
-      // Se estiver Pendente/Cancelada, a lógica de negócio deve decidir se atualiza.
-      // Por simplicidade, vamos considerar uma nova compra.
-      // Você pode adicionar lógica de atualização se necessário.
     }
 
-    // Simulação: Gera um código de transação fictício
     const codigoTransacao = `TRANS-${Date.now()}-${req.usuarioId}`;
 
-    // 4. Criar o registro de Participação (Simulando pagamento 'Confirmado')
     const novaParticipacao = await Participacao.create({
       convidadoId: req.usuarioId,
       ingressoId: ingressoId,
-      statusPagamento: 'Confirmado', // SIMULAÇÃO: Pagamento bem-sucedido
+      statusPagamento: 'Confirmado', 
       codigoTransacao: codigoTransacao,
     });
 
-    // Criar também registro em CompraIngresso para histórico detalhado
     try {
       const quantidadeComprada = parseInt(req.body.quantidade || 1, 10) || 1;
       const valorTotal = (ingresso.preco || 0) * quantidadeComprada;
@@ -1882,6 +1862,7 @@ http.listen(PORT, () => {
 });
 
 
+ 
 async function seedEvents() {
   try {
     let organizador1 = await Organizador.findOne();
@@ -1889,36 +1870,73 @@ async function seedEvents() {
     let organizador3 = await Organizador.findOne();
     let organizador4 = await Organizador.findOne();
     let organizador5 = await Organizador.findOne();
+    let organizador6 = await Organizador.findOne();
+    let organizador7 = await Organizador.findOne();
+    let organizador8 = await Organizador.findOne();
+    let organizador9 = await Organizador.findOne();
+    let organizador10 = await Organizador.findOne();
+
 
     if (!organizador1) {
       organizador1 = await Organizador.create({
         nome: "Jorge",
         email: "jorge@gmail.com",
         senha: "1234",
+        avatarUrl: "/uploads/org1/foto.jpg",
       });
       organizador2 = await Organizador.create({
         nome: "Yas",
         email: "yas@gmail.com",
         senha: "1234",
+        avatarUrl: "/uploads/org1/yas.jpg",
       });
 
       organizador3 = await Organizador.create({
         nome: "Rafael",
         email: "rafael@gmail.com",
         senha: "1234",
+        avatarUrl: "/uploads/org1/rafael.jpg",
       });
 
       organizador4 = await Organizador.create({
         nome: "Leandro",
-        email: "leandro@gamail.com",
+        email: "leandro@gmail.com",
         senha: "1234",
+        avatarUrl: "/uploads/org1/leandro.jpg",
       });
       organizador5 = await Organizador.create({
         nome: "Cayo",
-        email: "cayo@gamil.com",
+        email: "cayo@gmail.com",
         senha: "1234",
+        avatarUrl: "/uploads/org1/sonic.jpg",
       });
+      organizador6 = await Organizador.create({
+        nome: "Leonardo",
+        email: "leonardo@gmail.com",
+        senha: "1234",
+        avatarUrl: "/uploads/org1/leonardo.jpg",
 
+      });
+      organizador7 = await Organizador.create({
+        nome: "Nathalia",
+        email: "nathalia@gmail.com",
+        senha: "1234",
+        avatarUrl: "/uploads/org1/nath.jpg",
+
+      });
+      organizador8 = await Organizador.create({
+        nome: "BomBom",
+        email: "bombom@gmail.com",
+        senha: "1234",
+        avatarUrl: "/uploads/org1/bombom.jpg",
+      });
+      organizador9 = await Organizador.create({
+        nome: "Matheus",
+        email: "matheus@gmail.com",
+        senha: "1234",
+        avatarUrl: "/uploads/org1/matheus.jpg",
+
+      });
     }
 
     let convidado1 = await Convidado.findOne();
@@ -1967,8 +1985,7 @@ async function seedEvents() {
       },
     ]);
 
-    // Criar eventos
-    const eventos = await Evento.bulkCreate([
+   const eventos = await Evento.bulkCreate([
   {
     nomeEvento: "Evento de Futebol",
     descEvento: "Um incrível festival com os melhores clubes nacionais e internacionais",
@@ -1978,7 +1995,7 @@ async function seedEvents() {
     horaInicio: "16:00:00",
     dataFim: "2024-12-16",
     horaFim: "02:00:00",
-    statusEvento: "ativo", // ← GARANTIR QUE ESTÁ "ativo"
+    statusEvento: "ativo", 
     localizacaoId: localizacoes[2].localizacaoId,
     organizadorId: organizador1.organizadorId,
   },
@@ -1991,7 +2008,7 @@ async function seedEvents() {
     horaInicio: "16:00:00",
     dataFim: "2024-11-16",
     horaFim: "02:00:00",
-    statusEvento: "ativo", // ← GARANTIR QUE ESTÁ "ativo"
+    statusEvento: "ativo", 
     localizacaoId: localizacoes[2].localizacaoId,
     organizadorId: organizador1.organizadorId,
   },
@@ -2004,7 +2021,7 @@ async function seedEvents() {
     horaInicio: "16:00:00",
     dataFim: "2024-12-16",
     horaFim: "02:00:00",
-    statusEvento: "ativo", // ← GARANTIR QUE ESTÁ "ativo"
+    statusEvento: "ativo", 
     localizacaoId: localizacoes[2].localizacaoId,
     organizadorId: organizador1.organizadorId,
   },  
@@ -2017,7 +2034,7 @@ async function seedEvents() {
     horaInicio: "16:00:00",
     dataFim: "2024-12-16",
     horaFim: "02:00:00",
-    statusEvento: "ativo", // ← GARANTIR QUE ESTÁ "ativo"
+    statusEvento: "ativo", 
     localizacaoId: localizacoes[2].localizacaoId,
     organizadorId: organizador1.organizadorId,
   },
@@ -2031,7 +2048,7 @@ async function seedEvents() {
     horaInicio: "16:00:00",
     dataFim: "2024-12-16",
     horaFim: "02:00:00",
-    statusEvento: "ativo", // ← GARANTIR QUE ESTÁ "ativo"
+    statusEvento: "ativo", 
     localizacaoId: localizacoes[2].localizacaoId,
     organizadorId: organizador1.organizadorId,
   },
@@ -2045,7 +2062,7 @@ async function seedEvents() {
     horaInicio: "16:00:00",
     dataFim: "2024-12-16",
     horaFim: "02:00:00",
-    statusEvento: "ativo", // ← GARANTIR QUE ESTÁ "ativo"
+    statusEvento: "ativo", 
     localizacaoId: localizacoes[0].localizacaoId,
     organizadorId: organizador2.organizadorId,
   },
@@ -2058,7 +2075,7 @@ async function seedEvents() {
     horaInicio: "16:00:00",
     dataFim: "2024-11-16",
     horaFim: "02:00:00",
-    statusEvento: "ativo", // ← GARANTIR QUE ESTÁ "ativo"
+    statusEvento: "ativo",
     localizacaoId: localizacoes[0].localizacaoId,
     organizadorId: organizador2.organizadorId,
   },
@@ -2071,7 +2088,7 @@ async function seedEvents() {
     horaInicio: "16:00:00",
     dataFim: "2024-12-16",
     horaFim: "02:00:00",
-    statusEvento: "ativo", // ← GARANTIR QUE ESTÁ "ativo"
+    statusEvento: "ativo", 
     localizacaoId: localizacoes[0].localizacaoId,
     organizadorId: organizador2.organizadorId,
   },  
@@ -2084,7 +2101,7 @@ async function seedEvents() {
     horaInicio: "16:00:00",
     dataFim: "2024-12-16",
     horaFim: "02:00:00",
-    statusEvento: "ativo", // ← GARANTIR QUE ESTÁ "ativo"
+    statusEvento: "ativo", 
     localizacaoId: localizacoes[0].localizacaoId,
     organizadorId: organizador2.organizadorId,
   },
@@ -2098,7 +2115,7 @@ async function seedEvents() {
     horaInicio: "16:00:00",
     dataFim: "2024-12-16",
     horaFim: "02:00:00",
-    statusEvento: "ativo", // ← GARANTIR QUE ESTÁ "ativo"
+    statusEvento: "ativo", 
     localizacaoId: localizacoes[0].localizacaoId,
     organizadorId: organizador2.organizadorId,
   },
@@ -2112,7 +2129,7 @@ async function seedEvents() {
     horaInicio: "16:00:00",
     dataFim: "2024-12-16",
     horaFim: "02:00:00",
-    statusEvento: "ativo", // ← GARANTIR QUE ESTÁ "ativo"
+    statusEvento: "ativo", 
     localizacaoId: localizacoes[1].localizacaoId,
     organizadorId: organizador3.organizadorId,
   },
@@ -2125,7 +2142,7 @@ async function seedEvents() {
     horaInicio: "16:00:00",
     dataFim: "2024-12-16",
     horaFim: "02:00:00",
-    statusEvento: "ativo", // ← GARANTIR QUE ESTÁ "ativo"
+    statusEvento: "ativo", 
     localizacaoId: localizacoes[1].localizacaoId,
     organizadorId: organizador3.organizadorId,
   },  
@@ -2138,11 +2155,39 @@ async function seedEvents() {
     horaInicio: "16:00:00",
     dataFim: "2024-12-16",
     horaFim: "02:00:00",
-    statusEvento: "ativo", // ← GARANTIR QUE ESTÁ "ativo"
+    statusEvento: "ativo",
     localizacaoId: localizacoes[1].localizacaoId,
     organizadorId: organizador3.organizadorId,
   },
 
+    {
+    nomeEvento: "Festa Achiropita ",
+    descEvento: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+    categoria: "Gastronomia",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-12-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-12-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo", 
+    localizacaoId: localizacoes[1].localizacaoId,
+    organizadorId: organizador3.organizadorId,
+  },
+
+  {
+    nomeEvento: "Bon Odori - Gastronomia Japonesa ",
+    descEvento: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+    categoria: "Gastronomia",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-12-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-12-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo",
+    localizacaoId: localizacoes[1].localizacaoId,
+    organizadorId: organizador3.organizadorId,
+  },
+  
   {
     nomeEvento: "Desfile de Moda",
     descEvento: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
@@ -2170,8 +2215,46 @@ async function seedEvents() {
     localizacaoId: localizacoes[1].localizacaoId,
     organizadorId: organizador4.organizadorId,
   },
+  {
+    nomeEvento: "Baile Sephora",
+    descEvento: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+    categoria: "Moda e Beleza",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-12-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-12-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo", 
+    localizacaoId: localizacoes[1].localizacaoId,
+    organizadorId: organizador4.organizadorId,
+  },
+  {
+    nomeEvento: "Victoria's Secret",
+    descEvento: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+    categoria: "Moda e Beleza",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-12-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-12-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo", 
+    localizacaoId: localizacoes[1].localizacaoId,
+    organizadorId: organizador4.organizadorId,
+  },
 
-
+  {
+    nomeEvento: "Fashion Week - London",
+    descEvento: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+    categoria: "Moda e Beleza",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-12-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-12-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo", 
+    localizacaoId: localizacoes[1].localizacaoId,
+    organizadorId: organizador4.organizadorId,
+  },
   {
     nomeEvento: "Evento na Disney",
     descEvento: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
@@ -2211,9 +2294,295 @@ async function seedEvents() {
     localizacaoId: localizacoes[1].localizacaoId,
     organizadorId: organizador5.organizadorId,
   },
-]);
+  {
+    nomeEvento: "Festa Shrek No Pantano",
+    descEvento: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+    categoria: "Infantil",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-12-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-12-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo", 
+    localizacaoId: localizacoes[1].localizacaoId,
+    organizadorId: organizador5.organizadorId,
+  },
+  
+  {
+    nomeEvento: "Versão Infantojuvenil - Debate Político Social Sobre a Situação do Brasi",
+    descEvento: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+    categoria: "Infantil",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-12-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-12-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo", 
+    localizacaoId: localizacoes[1].localizacaoId,
+    organizadorId: organizador5.organizadorId,
+  },
+  {
+    nomeEvento: "CCXP",
+    descEvento: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+    categoria: "Games e Geek",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-12-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-12-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo", 
+    localizacaoId: localizacoes[1].localizacaoId,
+    organizadorId: organizador6.organizadorId,
+  },
+  {
+    nomeEvento: "Expo",
+    descEvento: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+    categoria: "Games e Geek",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-12-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-12-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo", 
+    localizacaoId: localizacoes[1].localizacaoId,
+    organizadorId: organizador6.organizadorId,
+  },
+  {
+    nomeEvento: "Feira Geek",
+    descEvento: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+    categoria: "Games e Geek",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-12-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-12-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo", 
+    localizacaoId: localizacoes[1].localizacaoId,
+    organizadorId: organizador6.organizadorId,
+  },
+  {
+    nomeEvento: "Anime Friends",
+    descEvento: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+    categoria: "Games e Geek",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-12-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-12-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo", 
+    localizacaoId: localizacoes[1].localizacaoId,
+    organizadorId: organizador6.organizadorId,
+  },
+  {
+    nomeEvento: "SwordPlay",
+    descEvento: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+    categoria: "Games e Geek",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-12-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-12-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo", 
+    localizacaoId: localizacoes[1].localizacaoId,
+    organizadorId: organizador6.organizadorId,
+  },  
+  {
+    nomeEvento: "Visita Farol Santander",
+    descEvento: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+    categoria: "Arte, Cultura e Lazer",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-12-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-12-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo", 
+    localizacaoId: localizacoes[0].localizacaoId,
+    organizadorId: organizador7.organizadorId,
+  },  
+  {
+    nomeEvento: "Visita Museu da Língua Portuguesa",
+    descEvento: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+    categoria: "Arte, Cultura e Lazer",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-12-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-12-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo", 
+    localizacaoId: localizacoes[0].localizacaoId,
+    organizadorId: organizador7.organizadorId,
+  },
+  {
+    nomeEvento: "Exposição MASP",
+    descEvento: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+    categoria: "Arte, Cultura e Lazer",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-12-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-12-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo", 
+    localizacaoId: localizacoes[0].localizacaoId,
+    organizadorId: organizador7.organizadorId,
+  },
+  {
+    nomeEvento: "Virada Cultural",
+    descEvento: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+    categoria: "Arte, Cultura e Lazer",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-12-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-12-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo", 
+    localizacaoId: localizacoes[0].localizacaoId,
+    organizadorId: organizador7.organizadorId,
+  },
+  {
+    nomeEvento: "Encontro de Yoga No Ibirapuera",
+    descEvento: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+    categoria: "Arte, Cultura e Lazer",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-12-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-12-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo", 
+    localizacaoId: localizacoes[0].localizacaoId,
+    organizadorId: organizador7.organizadorId,
+  },
+  {
+    nomeEvento: "Opéra Nice Côte d'Azur",
+    descEvento: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+    categoria: "Teatros e Espetáculos",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-12-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-12-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo", 
+    localizacaoId: localizacoes[0].localizacaoId,
+    organizadorId: organizador8.organizadorId,
+  },
+  {
+    nomeEvento: "Concerto Hilda Furacão",
+    descEvento: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+    categoria: "Teatros e Espetáculos",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-12-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-12-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo", 
+    localizacaoId: localizacoes[0].localizacaoId,
+    organizadorId: organizador8.organizadorId,
+  },
+  {
+    nomeEvento: "Apresentação O Fantasma da Ópera",
+    descEvento: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+    categoria: "Teatros e Espetáculos",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-12-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-12-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo", 
+    localizacaoId: localizacoes[0].localizacaoId,
+    organizadorId: organizador8.organizadorId,
+  },
+  {
+    nomeEvento: "Orquestra Sinfônica",
+    descEvento: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+    categoria: "Teatros e Espetáculos",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-12-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-12-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo", 
+    localizacaoId: localizacoes[0].localizacaoId,
+    organizadorId: organizador8.organizadorId,
+  },
+  {
+    nomeEvento: "Visita Theatro Municipal de SP",
+    descEvento: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+    categoria: "Teatros e Espetáculos",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-12-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-12-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo", 
+    localizacaoId: localizacoes[0].localizacaoId,
+    organizadorId: organizador8.organizadorId,
+  },
+  {
+    nomeEvento: "Palestra OAB",
+    descEvento: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+    categoria: "Congressos e Palestras",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-12-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-12-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo", 
+    localizacaoId: localizacoes[0].localizacaoId,
+    organizadorId: organizador9.organizadorId,
+  },
+  {
+    nomeEvento: "Palestra Médico Obstetricista",
+    descEvento: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+    categoria: "Congressos e Palestras",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-12-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-12-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo", 
+    localizacaoId: localizacoes[0].localizacaoId,
+    organizadorId: organizador9.organizadorId,
+  },
+  {
+    nomeEvento: "Congresso Odontologia",
+    descEvento: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+    categoria: "Congressos e Palestras",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-12-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-12-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo", 
+    localizacaoId: localizacoes[0].localizacaoId,
+    organizadorId: organizador9.organizadorId,
+  },
+  {
+    nomeEvento: "Palestra - Prevenção do HPV",
+    descEvento: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+    categoria: "Congressos e Palestras",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-12-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-12-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo", 
+    localizacaoId: localizacoes[0].localizacaoId,
+    organizadorId: organizador9.organizadorId,
+  },
+  {
+    nomeEvento: "Congresso AIDA",
+    descEvento: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+    categoria: "Congressos e Palestras",
+    privacidadeEvento: "Público",
+    dataInicio: "2024-12-15",
+    horaInicio: "16:00:00",
+    dataFim: "2024-12-16",
+    horaFim: "02:00:00",
+    statusEvento: "ativo", 
+    localizacaoId: localizacoes[0].localizacaoId,
+    organizadorId: organizador9.organizadorId,
+  },
 
-    // Adicionar mídias (usando a imagem fornecida)
+]);
     await Midia.bulkCreate([
       {
         eventoId: eventos[0].eventoId,
@@ -2240,9 +2609,6 @@ async function seedEvents() {
         url: "/uploads/org1/galeriabasquete1.jpg",
         tipo: "capa",
       },
-
-
-        
       {
         eventoId: eventos[5].eventoId,
         url: "/uploads/org2/show1.jpg",
@@ -2286,32 +2652,167 @@ async function seedEvents() {
       },
       {
         eventoId: eventos[13].eventoId,
-        url: "/uploads/org4/desfile1.jpg",
+        url: "/uploads/org3/achi.jpg",
         tipo: "capa",
       },
       {
         eventoId: eventos[14].eventoId,
-        url: "/uploads/org4/foto1.jpg",
+        url: "/uploads/org3/jap.jpg",
         tipo: "capa",
       },
       {
         eventoId: eventos[15].eventoId,
-        url: "/uploads/org5/ney1.jpg",
+        url: "/uploads/org4/desfile1.jpg",
         tipo: "capa",
       },
       {
         eventoId: eventos[16].eventoId,
-        url: "/uploads/org5/pat1.jpg",
+        url: "/uploads/org4/foto1.jpg",
         tipo: "capa",
       },
       {
         eventoId: eventos[17].eventoId,
+        url: "/uploads/org4/baile.jpg",
+        tipo: "capa",
+      },
+      {
+        eventoId: eventos[18].eventoId,
+        url: "/uploads/org4/adri.jpg",
+        tipo: "capa",
+      },
+      {
+        eventoId: eventos[19].eventoId,
+        url: "/uploads/org4/week.jpg",
+        tipo: "capa",
+      },
+      {
+        eventoId: eventos[20].eventoId,
+        url: "/uploads/org5/ney1.jpg",
+        tipo: "capa",
+      },
+      {
+        eventoId: eventos[21].eventoId,
+        url: "/uploads/org5/pat1.jpg",
+        tipo: "capa",
+      }, 
+      {
+        eventoId: eventos[22].eventoId,
         url: "/uploads/org5/sonic1.jpg",
+        tipo: "capa",
+      },
+      {
+        eventoId: eventos[23].eventoId,
+        url: "/uploads/org5/pantano.jpg",
+        tipo: "capa",
+      },          
+      {
+        eventoId: eventos[24].eventoId,
+        url: "/uploads/org5/mini.jpg",
+        tipo: "capa",
+      },
+      {
+        eventoId: eventos[25].eventoId,
+        url: "/uploads/org6/ccxp.jpg",
+        tipo: "capa",
+      },
+      {
+        eventoId: eventos[26].eventoId,
+        url: "/uploads/org6/expo.jpg",
+        tipo: "capa",
+      },      
+      {
+        eventoId: eventos[27].eventoId,
+        url: "/uploads/org6/feira.jpg",
+        tipo: "capa",
+      },      
+      {
+        eventoId: eventos[28].eventoId,
+        url: "/uploads/org6/friends.jpg",
+        tipo: "capa",
+      },      
+      {
+        eventoId: eventos[29].eventoId,
+        url: "/uploads/org6/play.jpg",
+        tipo: "capa",
+      },
+      {
+        eventoId: eventos[30].eventoId,
+        url: "/uploads/org7/farol.jpg",
+        tipo: "capa",
+      },
+      {
+        eventoId: eventos[31].eventoId,
+        url: "/uploads/org7/lp.jpg",
+        tipo: "capa",
+      },
+      {
+        eventoId: eventos[32].eventoId,
+        url: "/uploads/org7/masp.jpg",
+        tipo: "capa",
+      },
+      {
+        eventoId: eventos[33].eventoId,
+        url: "/uploads/org7/virada.jpg",
+        tipo: "capa",
+      },
+      {
+        eventoId: eventos[34].eventoId,
+        url: "/uploads/org7/yoga.jpg",
+        tipo: "capa",
+      },
+      {
+        eventoId: eventos[35].eventoId,
+        url: "/uploads/org8/ballet.jpg",
+        tipo: "capa",
+      },
+      {
+        eventoId: eventos[36].eventoId,
+        url: "/uploads/org8/concertohil.jpg",
+        tipo: "capa",
+      },
+      {
+        eventoId: eventos[37].eventoId,
+        url: "/uploads/org8/fantasma.jpg",
+        tipo: "capa",
+      },
+      {
+        eventoId: eventos[38].eventoId,
+        url: "/uploads/org8/orquestra.jpg",
+        tipo: "capa",
+      },
+      {
+        eventoId: eventos[39].eventoId,
+        url: "/uploads/org8/theatro.jpg",
+        tipo: "capa",
+      },
+      {
+        eventoId: eventos[40].eventoId,
+        url: "/uploads/org9/adv.jpg",
+        tipo: "capa",
+      },
+      {
+        eventoId: eventos[41].eventoId,
+        url: "/uploads/org9/medico.jpg",
+        tipo: "capa",
+      },
+      {
+        eventoId: eventos[42].eventoId,
+        url: "/uploads/org9/odonto.jpg",
+        tipo: "capa",
+      },
+      {
+        eventoId: eventos[43].eventoId,
+        url: "/uploads/org9/palestra.jpg",
+        tipo: "capa",
+      },
+      {
+        eventoId: eventos[44].eventoId,
+        url: "/uploads/org9/sii.jpg",
         tipo: "capa",
       },
     ]);
 
-    // Adicionar ingressos
+
     await Ingresso.bulkCreate([
       {
         eventoId: eventos[0].eventoId,
@@ -2457,6 +2958,254 @@ async function seedEvents() {
         quantidade: 20,
         dataLimite: "2024-03-08",
       },
+      {
+        eventoId: eventos[14].eventoId,
+        nome: "Participante",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 200.0,
+        quantidade: 20,
+        dataLimite: "2024-03-08",
+      },
+      {
+        eventoId: eventos[15].eventoId,
+        nome: "Participante",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 0,
+        quantidade: 20,
+        dataLimite: "2024-03-08",
+      },
+      {
+        eventoId: eventos[16].eventoId,
+        nome: "Participante",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 0,
+        quantidade: 20,
+        dataLimite: "2024-03-08",
+      },
+      {
+        eventoId: eventos[17].eventoId,
+        nome: "Participante",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 0,
+        quantidade: 20,
+        dataLimite: "2024-03-08",
+      },
+      {
+        eventoId: eventos[18].eventoId,
+        nome: "Participante",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 0,
+        quantidade: 20,
+        dataLimite: "2024-03-08",
+      },
+      {
+        eventoId: eventos[19].eventoId,
+        nome: "Participante",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 0,
+        quantidade: 20,
+        dataLimite: "2024-03-08",
+      },
+      {
+        eventoId: eventos[20].eventoId,
+        nome: "Participante",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 0,
+        quantidade: 20,
+        dataLimite: "2024-03-08",
+      },
+      {
+        eventoId: eventos[21].eventoId,
+        nome: "Participante",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 0,
+        quantidade: 20,
+        dataLimite: "2024-03-08",
+      },
+      {
+        eventoId: eventos[22].eventoId,
+        nome: "Participante",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 0,
+        quantidade: 20,
+        dataLimite: "2024-03-08",
+      },
+      {
+        eventoId: eventos[23].eventoId,
+        nome: "Participante",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 0,
+        quantidade: 20,
+        dataLimite: "2024-03-08",
+      },
+      {
+        eventoId: eventos[24].eventoId,
+        nome: "Participante",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 0,
+        quantidade: 20,
+        dataLimite: "2024-03-08",
+      },
+      {
+        eventoId: eventos[25].eventoId,
+        nome: "Participante",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 0,
+        quantidade: 20,
+        dataLimite: "2024-03-08",
+      },
+      {
+        eventoId: eventos[26].eventoId,
+        nome: "Participante",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 0,
+        quantidade: 20,
+        dataLimite: "2024-03-08",
+      },
+      {
+        eventoId: eventos[27].eventoId,
+        nome: "Participante",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 0,
+        quantidade: 20,
+        dataLimite: "2024-03-08",
+      },
+      {
+        eventoId: eventos[28].eventoId,
+        nome: "Participante",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 0,
+        quantidade: 20,
+        dataLimite: "2024-03-08",
+      },
+      {
+        eventoId: eventos[29].eventoId,
+        nome: "Participante",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 0,
+        quantidade: 20,
+        dataLimite: "2024-03-08",
+      },
+      {
+        eventoId: eventos[30].eventoId,
+        nome: "Participante",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 0,
+        quantidade: 20,
+        dataLimite: "2024-03-08",
+      },
+      {
+        eventoId: eventos[31].eventoId,
+        nome: "Participante",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 0,
+        quantidade: 20,
+        dataLimite: "2024-03-08",
+      },
+      {
+        eventoId: eventos[32].eventoId,
+        nome: "Participante",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 300.0,
+        quantidade: 20,
+        dataLimite: "2024-03-08",
+      },
+      {
+        eventoId: eventos[33].eventoId,
+        nome: "Participante",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 0,
+        quantidade: 20,
+        dataLimite: "2024-03-08",
+      },
+      {
+        eventoId: eventos[34].eventoId,
+        nome: "Participante",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 0,
+        quantidade: 20,
+        dataLimite: "2024-03-08",
+      },
+      {
+        eventoId: eventos[35].eventoId,
+        nome: "Participante",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 1000.0,
+        quantidade: 20,
+        dataLimite: "2024-03-08",
+      },
+      {
+        eventoId: eventos[36].eventoId,
+        nome: "Participante",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 1000.0,
+        quantidade: 20,
+        dataLimite: "2024-03-08",
+      },
+      {
+        eventoId: eventos[37].eventoId,
+        nome: "Participante",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 1000.0,
+        quantidade: 20,
+        dataLimite: "2024-03-08",
+      },
+      {
+        eventoId: eventos[38].eventoId,
+        nome: "Participante",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 1000.0,
+        quantidade: 20,
+        dataLimite: "2024-03-08",
+      },
+      {
+        eventoId: eventos[39].eventoId,
+        nome: "Participante",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 0,
+        quantidade: 20,
+        dataLimite: "2024-03-08",
+      },
+      {
+        eventoId: eventos[40].eventoId,
+        nome: "Participante",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 0,
+        quantidade: 20,
+        dataLimite: "2024-03-08",
+      },
+      {
+        eventoId: eventos[41].eventoId,
+        nome: "Participante",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 200.0,
+        quantidade: 20,
+        dataLimite: "2024-03-08",
+      },
+      {
+        eventoId: eventos[42].eventoId,
+        nome: "Participante",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 400.0,
+        quantidade: 20,
+        dataLimite: "2024-03-08",
+      },
+      {
+        eventoId: eventos[43].eventoId,
+        nome: "Participante",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 200.0,
+        quantidade: 20,
+        dataLimite: "2024-03-08",
+      },
+      {
+        eventoId: eventos[44].eventoId,
+        nome: "Participante",
+        descricao: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum pulvinar, eros a placerat.",
+        preco: 700.0,
+        quantidade: 20,
+        dataLimite: "2024-03-08",
+      },
     ]);
 
     console.log("Eventos criados com sucesso!");
@@ -2466,16 +3215,11 @@ async function seedEvents() {
   } catch (error) {
     console.error("Erro ao criar eventos:", error);
   } finally {
-    // Não fechar a conexão aqui: o processo do servidor continua em execução
-    // await sequelize.close();
   }
 }
 
-// Executar o script
-// Sincronizar modelos primeiro e então executar o seed para garantir que as tabelas existam.
-// ATENÇÃO: `force: true` irá dropar tabelas existentes — usar somente em dev/test.
 sequelize
-  .sync({ force: true })
+  .sync({ force: false })
   .then(async () => {
     console.log("Modelos sincronizados com o banco de dados");
     try {
