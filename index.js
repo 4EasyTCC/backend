@@ -1157,8 +1157,9 @@ app.get("/api/eventos/filtrados", async (req, res) => {
     }
 
     // Filtro por categoria (suporta múltiplas categorias)
+    // Use | as separator to avoid splitting on category names with commas
     if (categoria && categoria !== "") {
-      const categoriasArray = categoria.split(",");
+      const categoriasArray = categoria.split("|").map(c => c.trim()).filter(c => c);
       whereClause.categoria = { [Op.in]: categoriasArray };
     }
 
@@ -3219,7 +3220,7 @@ async function seedEvents() {
 }
 
 sequelize
-  .sync({ force: false })
+  .sync({ force: true })
   .then(async () => {
     console.log("Modelos sincronizados com o banco de dados");
     try {
